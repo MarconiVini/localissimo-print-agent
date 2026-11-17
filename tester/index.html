@@ -1,0 +1,1317 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Tester · Comandas Térmicas</title>
+<style>
+  :root {
+    --bg: #14161a;
+    --panel: #1d2026;
+    --panel-2: #242830;
+    --border: #2e333d;
+    --text: #e8e6e1;
+    --muted: #9aa0ab;
+    --accent: #f5a524;
+    --green: #4cc38a;
+    --red: #e5484d;
+    --blue: #5bb0e6;
+    --mono: ui-monospace, "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header.top {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 18px;
+    align-items: center;
+  }
+  header.top h1 { font-size: 15px; margin: 0; letter-spacing: .2px; }
+  header.top h1 small { color: var(--muted); font-weight: 400; }
+  .srv { display: flex; gap: 6px; }
+  .srv label {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 5px 12px;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 13px;
+    user-select: none;
+  }
+  .srv label:has(input:checked) {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(245, 165, 36, .08);
+    font-weight: 600;
+  }
+  .srv input { display: none; }
+  .conn { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .conn input[type=url], .conn input[type=text], .conn input[type=password] {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font: 12px var(--mono);
+    min-width: 230px;
+  }
+  .conn input:focus { outline: 1px solid var(--accent); }
+  main {
+    display: grid;
+    grid-template-columns: minmax(340px, 1fr) minmax(340px, 420px);
+    gap: 16px;
+    padding: 16px;
+    align-items: start;
+    justify-content: center;
+  }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  section.card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+  }
+  section.card h2 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin: 0 0 10px;
+  }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+  button {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 7px 13px;
+    font: 600 13px system-ui, sans-serif;
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primario { background: var(--accent); border-color: var(--accent); color: #14161a; }
+  button.primario:hover { filter: brightness(1.1); color: #14161a; }
+  button.perigo:hover { border-color: var(--red); color: var(--red); }
+  label.chk { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); font-size: 13px; cursor: pointer; }
+  input[type=number] {
+    width: 64px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 5px 8px;
+    font: 12px var(--mono);
+  }
+  select {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 5px 8px;
+    font: 12px var(--mono);
+  }
+  .hb {
+    font: 12px var(--mono);
+    color: var(--muted);
+    padding: 6px 10px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .hb .ponto { color: var(--red); }
+  .hb .ponto.viva { color: var(--green); }
+  details.ajuda {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin: 10px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  details.ajuda summary { cursor: pointer; color: var(--text); }
+  details.ajuda pre {
+    background: #14161a;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    font: 11.5px/1.6 var(--mono);
+    overflow-x: auto;
+    white-space: pre;
+  }
+  details.ajuda code { font-family: var(--mono); color: var(--accent); font-size: 12px; }
+  details.ajuda textarea.payload {
+    display: block;
+    width: 100%;
+    min-height: 130px;
+    margin-top: 8px;
+    background: #14161a;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font: 11.5px/1.6 var(--mono);
+    resize: vertical;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  details.ajuda textarea.payload:focus { outline: 1px solid var(--accent); }
+  /* ---- log ---- */
+  #log { display: flex; flex-direction: column; gap: 6px; max-height: 480px; overflow-y: auto; }
+  .req {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font: 12px var(--mono);
+    background: var(--panel-2);
+  }
+  .req summary {
+    cursor: pointer;
+    padding: 6px 10px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    list-style: none;
+  }
+  .req summary::-webkit-details-marker { display: none; }
+  .req .metodo { font-weight: 700; color: var(--blue); min-width: 44px; }
+  .req .metodo.post { color: var(--accent); }
+  .req .caminho { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .req .status { font-weight: 700; }
+  .req .status.s2 { color: var(--green); }
+  .req .status.s4 { color: var(--red); }
+  .req .status.sx { color: var(--red); }
+  .req .tempo { color: var(--muted); min-width: 52px; text-align: right; }
+  .req pre {
+    margin: 0;
+    padding: 8px 10px;
+    border-top: 1px solid var(--border);
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 220px;
+    overflow-y: auto;
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .req.erro summary { color: var(--red); }
+  .dica {
+    padding: 6px 10px;
+    border-top: 1px solid var(--border);
+    color: var(--accent);
+    font-size: 11px;
+  }
+  /* ---- papel ---- */
+  #papers { display: flex; flex-direction: column; gap: 18px; align-items: center; }
+  .vazio { color: var(--muted); text-align: center; padding: 30px 10px; font-size: 13px; }
+  .comanda { width: 100%; max-width: 340px; }
+  .comanda .barra {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 6px;
+    font: 11px var(--mono);
+  }
+  .badge {
+    font-weight: 700;
+    border-radius: 6px;
+    padding: 2px 8px;
+    letter-spacing: .5px;
+  }
+  .badge.kitchen { background: rgba(245, 165, 36, .15); color: var(--accent); }
+  .badge.delivery { background: rgba(91, 176, 230, .15); color: var(--blue); }
+  .comanda .barra .jobid { color: var(--muted); }
+  .comanda .barra .st { color: var(--muted); }
+  .comanda .barra .st.ok { color: var(--green); }
+  .comanda .barra .acoes { margin-left: auto; display: flex; gap: 4px; }
+  .comanda .barra button {
+    padding: 2px 9px;
+    font: 600 11px system-ui, sans-serif;
+    border-radius: 6px;
+  }
+  .comanda .barra label.chk {
+    display: inline-flex;
+    gap: 3px;
+    align-items: center;
+    font: 11px var(--mono);
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .papel {
+    background: #fbfaf5;
+    color: #16140f;
+    border-radius: 3px;
+    padding: 10px 12px 14px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, .5);
+    font-family: var(--mono);
+    line-height: 1.3;
+  }
+  .papel .linha { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .papel .linha.blank { min-height: calc(var(--fs) * 1.3); }
+  .papel .linha.dupla-w { display: block; transform: scaleX(var(--w)); }
+  .papel .corte {
+    position: relative;
+    border-top: 2px dashed #b9b29e;
+    margin: 10px 0 4px;
+    height: 14px;
+  }
+  .papel .corte::before {
+    content: "✂";
+    position: absolute;
+    left: -2px;
+    top: -0.9em;
+    color: #8d8776;
+    background: #fbfaf5;
+    padding: 0 2px;
+  }
+  .papel details.bytes {
+    margin-top: 10px;
+    font: 10px/1.5 var(--mono);
+    color: #6e6a5e;
+  }
+  .papel details.bytes pre {
+    margin: 4px 0 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <h1>Tester · Comandas Térmicas <small>épico docs/epicos/comandas-termicas.md — nada vai para impressora, só renderiza aqui</small></h1>
+  <div class="srv" id="srv">
+    <label><input type="radio" name="server" value="local" checked>Local</label>
+    <label><input type="radio" name="server" value="localissimo">Localíssimo</label>
+    <label><input type="radio" name="server" value="demo">Demo (fake embutido)</label>
+  </div>
+  <div class="conn">
+    <input type="url" id="url" placeholder="http://localhost:3000" spellcheck="false">
+    <input type="password" id="token" placeholder="token do print_device" spellcheck="false" autocomplete="off">
+  </div>
+</header>
+
+<main>
+  <!-- ============ painel de requests ============ -->
+  <section class="card">
+    <h2>Requests do device (contrato do épico, S4)</h2>
+
+    <div class="row">
+      <button id="bConfig">GET /impressora/config</button>
+      <button id="bPoll" class="primario">GET /impressora/jobs&nbsp;(poll)</button>
+      <button id="bAcks">ACK pendentes</button>
+    </div>
+    <div class="row">
+      <button id="bPrinters">POST /impressora/printers&nbsp;(report)</button>
+      <button id="bLogs">POST /impressora/logs&nbsp;(debug)</button>
+    </div>
+    <div class="row">
+      <label class="chk"><input type="checkbox" id="chkAuto"> poll automático a cada</label>
+      <input type="number" id="interval" min="1" max="60" value="3"> s
+      <label class="chk"><input type="checkbox" id="chkAutoAck" checked> ACK automático (como o agente)</label>
+    </div>
+    <div class="row">
+      <span class="hb" id="hb"><span class="ponto">●</span> sem poll ainda</span>
+      <button id="bClearReqs" class="perigo" style="margin-left:auto">limpar requests</button>
+      <button id="bClear" class="perigo">limpar papel</button>
+    </div>
+
+    <!-- settings do servidor demo -->
+    <div class="row" id="demoCfg" style="display:none; border-top:1px solid var(--border); padding-top:10px">
+      <strong style="font-size:12px">Config da impressora (demo):</strong>
+      <label class="chk">colunas
+        <select id="dCols"><option value="48">48</option><option value="32">32</option></select>
+      </label>
+      <label class="chk">codepage
+        <select id="dCp"><option>UTF-8</option><option>CP860</option><option>CP850</option></select>
+      </label>
+      <label class="chk"><input type="checkbox" id="dCut" checked> corte</label>
+      <label class="chk"><input type="checkbox" id="dDebug"> debug_mode</label>
+      <button id="bDemoReset">restaurar comandas demo</button>
+    </div>
+
+    <details class="ajuda" style="margin-top:10px">
+      <summary>Contrato do device — os 5 endpoints de token (S4)</summary>
+      <pre>Authorization: Bearer &lt;token&gt;  (esquema case-insensitive, RFC 7235)
+404 indistinto: token inválido · flag orders.comandas off · job alheio
+toda request autenticada conta como heartbeat (last_seen_at)
+
+GET  /impressora/config        config da impressora (decisão 15) — boot passo 3
+GET  /impressora/jobs          poll: jobs + payload base64 + config_version (decisão 13)
+POST /impressora/jobs/:id/ack  marca printed (decisão 9) · responde {pending}
+POST /impressora/printers      report do spooler (decisão 17) — boot passo 2, snapshot substitutivo
+POST /impressora/logs          logs do debug_mode (decisão 18) · TTL 3 dias · teto 300 linhas</pre>
+      <p>Ordem do boot do agente (decisão 17): token do arquivo → <strong>POST
+      /impressora/printers</strong> (passo 2) → só então <strong>GET /config</strong>
+      (passo 3) → loop poll→ack (passo 4). A superfície do owner
+      (<code>GET /owner/impressao</code> lote do modo browser e
+      <code>GET /owner/impressao/status</code> ticker de 30s) anda na sessão do
+      dono — não aceita o token do device, fora do escopo deste tester.</p>
+    </details>
+
+    <details class="ajuda" style="margin-top:10px">
+      <summary>Payload do POST /impressora/printers — report do spooler (decisão 17)</summary>
+      <p>Snapshot <strong>substitutivo</strong> das impressoras instaladas
+      (<code>EnumPrinters</code>): array com no máximo 50 entradas; cada entrada é
+      um objeto de chaves livres (≤ 20 chaves de ≤ 40 chars, valores
+      stringificados de ≤ 500 chars) e só sobrevive com <code>name</code>. Contrato
+      cravado no épico S5: <code>Porta</code> = porta TCP numérica como string
+      (<code>"9100"</code>), <code>PortaNome</code> = nome da porta no OS quando
+      existir (<code>IP_192.168.0.50</code>, <code>USB001</code>), <code>Host</code> =
+      IP/hostname da porta TCP/IP; todos os valores são strings (fonte:
+      <code>EnumPorts</code> no Windows, URI <code>socket://</code> do
+      <code>lpstat -v</code> no Linux/macOS). O agente real filtra impressoras de
+      arquivo/PDF/XPS antes do teto de 50. Edite à vontade para testar a saneação — o demo
+      aplica os mesmos tetos do Rails. O report é consulta/sugestão e nunca
+      vira config.</p>
+      <textarea id="taPrinters" class="payload" spellcheck="false">{
+  "printers": [
+    { "name": "Tomate MDK-080", "PortaNome": "IP_192.168.0.50", "Host": "192.168.0.50", "Porta": "9100", "Driver": "Tomate MDK-080", "Status": "Pronta" },
+    { "name": "POS-80 (USB)", "PortaNome": "USB001", "Driver": "POS-80", "Status": "Pronta" }
+  ]
+}</textarea>
+    </details>
+
+    <details class="ajuda" style="margin-top:10px">
+      <summary>Payload do POST /impressora/logs — rodada de debug (decisão 18)</summary>
+      <p>Com <code>debug_mode</code> ligado na config, cada rodada de execução do
+      agente vira um POST com <code>{"entries": [...]}</code> — um POST = uma linha em
+      <code>printer_debug_logs</code>. Saneação: máx. 200 entries de ≤ 2000 chars,
+      em branco é descartado (POST vazio não cria linha morta — <code>stored: 0</code>).
+      Vida útil de 3 dias: purga preguiçosa a cada POST + job diário; consulta
+      no card Comandas do painel admin.</p>
+      <textarea id="taLogs" class="payload" spellcheck="false">{
+  "entries": [
+    "rodada 42: poll 200 OK — 0 job(s), fila vazia",
+    "config_version inalterada — sem refetch",
+    "heartbeat ok; próxima rodada em 3s"
+  ]
+}</textarea>
+    </details>
+
+    <details class="ajuda" id="ajudaCadastro">
+      <summary>Como cadastrar o device de um negócio (e pegar o token)</summary>
+      <p>O token pertence a um <code>print_device</code> do negócio (mesmo padrão do
+      entregador — ADR-0001). Cadastre no Rails e cole o token aqui:</p>
+      <pre>cd ~/mv/projects/localissimo
+
+bin/rails runner '
+  negocio = Business.order(:id).first   # ou find_by!(name: "Nome do negócio")
+
+  device = PrintDevice.create!(business: negocio, name: "Tester HTML")
+  Printer.find_or_create_by!(business: negocio) do |p|
+    p.assign_attributes(name: "Cozinha – Tomate MDK-080",
+                        host: "192.168.0.50", port: 9100)
+  end
+  puts device.access_token
+'</pre>
+      <p>No modo <strong>Demo</strong> não precisa de token (qualquer um vale). Nos
+      servidores reais, os endpoints do S4 vivem na branch
+      <code>feat/comandas-termicas</code> (S0–S4 feitos, sem merge na main) e o CORS
+      para esta página já vem neles (middleware <code>PrintAgentCors</code>, liberado
+      só em <code>/impressora</code>). No modo agent o token nasce no card do owner —
+      "Conectar agente no Windows" cria/reusa o device "Agente no balcão" e mostra
+      o token com copiar.</p>
+    </details>
+
+    <h2 style="margin-top:14px">Log</h2>
+    <div id="log"><div class="vazio">sem requests ainda</div></div>
+  </section>
+
+  <!-- ============ papel ============ -->
+  <section class="card">
+    <h2>Papel 80mm — render do payload ESC/POS</h2>
+    <div id="papers"><div class="vazio">Nenhuma comanda ainda.<br>Dê um poll (ou, no modo Demo, clique em “restaurar comandas demo”).</div></div>
+  </section>
+</main>
+
+<script>
+"use strict";
+
+/* =====================================================================
+ * Tester do agente de impressão — simula o device (épico, decisões 7, 12,
+ * 17 e 18) sem tocar em impressora: o payload ESC/POS que o servidor
+ * devolve é interpretado aqui e desenhado como papel 80mm.
+ * ===================================================================== */
+
+/* ---------------- utilidades ---------------- */
+
+const $ = (id) => document.getElementById(id);
+
+function store() {
+  // localStorage pode faltar (file:// restrito, modo privado) — tester degrada, não quebra.
+  try { return window.localStorage; } catch { return null; }
+}
+const LS_KEY = "lpTester";
+
+function saveState() {
+  const s = store();
+  if (!s) return;
+  s.setItem(LS_KEY, JSON.stringify({
+    server: state.server, urlLocal: state.urlLocal, urlProd: state.urlProd,
+    tokenLocal: state.tokenLocal, tokenProd: state.tokenProd,
+    autoAck: state.autoAck, autoPoll: state.autoPoll, interval: state.interval,
+    demoCols: state.demoCols, demoCp: state.demoCp, demoCut: state.demoCut,
+    demoDebug: state.demoDebug,
+  }));
+}
+
+function loadState() {
+  const def = {
+    server: "local", urlLocal: "http://localhost:3000", urlProd: "https://localissimo.com.br",
+    tokenLocal: "", tokenProd: "", autoAck: true, autoPoll: false, interval: 3,
+    demoCols: 48, demoCp: "UTF-8", demoCut: true, demoDebug: false,
+  };
+  try {
+    const raw = store()?.getItem(LS_KEY);
+    return raw ? Object.assign(def, JSON.parse(raw)) : def;
+  } catch { return def; }
+}
+
+const state = loadState();
+
+const fmtBRL = (v) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const hhmmss = (d) => d.toTimeString().slice(0, 8);
+const hojeDM = () => { const d = new Date(); return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`; };
+
+/* =====================================================================
+ * Codepages — tabela aproximada do núcleo comum CP437/CP860/CP850
+ * (0x80–0xFF). Os acentos do PT-BR mapeiam; glifos de caixa podem divergir
+ * por firmware — o épico marca codepage como risco nº 1 e o spike S0 fecha
+ * a tabela de verdade. Byte fora da tabela → "·".
+ * ===================================================================== */
+
+const CP_CORE = (
+  "ÇüéâäàåçêëèïîìÅÉ" +      // 0x80
+  "æÆôöòûùÿÖÜ¢£¥₧ƒá" +      // 0x90
+  "íóúñÑªº¿⌐¬½¼¡«»░" +      // 0xA0
+  "▒▓│┤ÁÂÀ©╣║╬¢¥┐└┴" +      // 0xB0
+  "┬├─┼╞╟╚╔╩╦╠═╬╧╨╤" +      // 0xC0
+  "╥╙╘╒╓╫╪┘┌█▄▌▐▀αß" +      // 0xD0
+  "ΓπΣσµτΦΘΩδ∞φε∩≡±" +      // 0xE0
+  "≥≤⌠⌡÷≈°∙·√ⁿ²■ "          // 0xF0
+);
+// Overrides por codepage (o que diverge do núcleo; aproximado — ver S0):
+const CP_OVERRIDES = {
+  "CP860": { 0x84: "ã", 0x94: "õ" },
+  "CP850": {},
+  "UTF-8": null, // null = decodifica UTF-8 de verdade
+};
+
+function cpChar(byte, cp) {
+  const ov = CP_OVERRIDES[cp];
+  if (ov && ov[byte] !== undefined) return ov[byte];
+  const i = byte - 0x80;
+  return i >= 0 && i < CP_CORE.length ? CP_CORE[i] : "·";
+}
+
+// String → bytes na codepage (o que o builder do S2 fará no Rails).
+// Reverso construído uma vez por codepage; caractere fora → "?" (como na impressora).
+const CP_REVERSE = {};
+function encodeStr(s, cp) {
+  if (cp === "UTF-8" || CP_OVERRIDES[cp] === null) return Array.from(new TextEncoder().encode(s));
+  let rev = CP_REVERSE[cp];
+  if (!rev) {
+    rev = {};
+    for (let b = 0x20; b < 0x7f; b++) rev[String.fromCharCode(b)] = b;
+    for (let b = 0x80; b < 0x100; b++) {
+      const ch = cpChar(b, cp);
+      if (ch !== "·" && rev[ch] === undefined) rev[ch] = b;
+    }
+    CP_REVERSE[cp] = rev;
+  }
+  const out = [];
+  for (const ch of s) out.push(rev[ch] !== undefined ? rev[ch] : "?".charCodeAt(0));
+  return out;
+}
+
+// bytes → string (inverso do encode; o payload chega em base64 do servidor)
+function decodeBytes(bytes, cp) {
+  if (CP_OVERRIDES[cp] === null) return new TextDecoder("utf-8", { fatal: false }).decode(new Uint8Array(bytes));
+  let out = "";
+  for (const b of bytes) out += b < 0x80 ? String.fromCharCode(b) : cpChar(b, cp);
+  return out;
+}
+
+/* =====================================================================
+ * Interpretador ESC/POS → operações de render.
+ * Suporta o subconjunto que o builder do S2 vai emitir (épico, decisão 8):
+ * ESC @ · ESC ! n · GS ! n · ESC E · ESC - · ESC a · ESC d · ESC J ·
+ * ESC t · GS V (corte — épico S0) · LF/CR/TAB. Sequência desconhecida é
+ * pulada com elegância (o agente real é um cano: aqui também não quebra).
+ * ===================================================================== */
+
+function decodeEscpos(bytes, cp) {
+  const s = decodeBytes(bytes, cp);
+  const ops = [];
+  let st = { w: 1, h: 1, bold: false, u: false, align: 0 };
+  let buf = null; // { text, st } — estilo congelado no 1º char da linha
+
+  const flush = () => { if (buf) { ops.push({ t: "l", text: buf.text, ...buf.st }); buf = null; } };
+  const line = () => { flush(); ops.push({ t: "l", text: "", w: 1, h: 1 }); };
+  const feed = (n) => { flush(); ops.push({ t: "f", n }); };
+  const cut = (n) => { flush(); ops.push({ t: "c", feed: n || 0 }); };
+  const put = (ch) => {
+    if (buf && (buf.st.w !== st.w || buf.st.h !== st.h || buf.st.bold !== st.bold ||
+                buf.st.u !== st.u || buf.st.align !== st.align)) flush();
+    if (!buf) buf = { text: "", st: { ...st } };
+    buf.text += ch;
+  };
+  const code = (i) => s.charCodeAt(i) & 0xff;
+
+  let i = 0;
+  while (i < s.length) {
+    const c = s[i];
+    if (c === "\x1b") { // ESC
+      const fn = s[i + 1];
+      switch (fn) {
+        case "@": flush(); st = { w: 1, h: 1, bold: false, u: false, align: 0 }; i += 2; continue;
+        case "!": { // modo: bit3 bold, bit4 dupla-alura, bit5 dupla-largura, bit7 sublinhado
+          const n = code(i + 2);
+          st.bold = !!(n & 0x08); st.h = (n & 0x10) ? 2 : 1; st.w = (n & 0x20) ? 2 : 1; st.u = !!(n & 0x80);
+          i += 3; continue;
+        }
+        case "E": st.bold = code(i + 2) !== 0; i += 3; continue;
+        case "-": st.u = code(i + 2) !== 0; i += 3; continue;
+        case "a": st.align = Math.min(code(i + 2) & 0x03, 2); i += 3; continue;
+        case "d": feed(code(i + 2)); i += 3; continue;             // alimenta n linhas
+        case "J": feed(1); i += 3; continue;                        // alimenta n pontos ≈ 1 linha
+        case "t": i += 3; continue;                                 // troca codepage: já decodificamos tudo
+        case "2": case "0": i += 2; continue;                       // espaçamento entre linhas
+        default:
+          if (fn === undefined) { i += 1; continue; }
+          i += 2; // sequência desconhecida: pula ESC+fn (best effort)
+          continue;
+      }
+    }
+    if (c === "\x1d") { // GS
+      const fn = s[i + 1];
+      if (fn === "V") { // corte — épico S0: "papel corta"
+        const m = code(i + 2);
+        if (m === 65 || m === 66) { cut(code(i + 3)); i += 4; }     // corta após n linhas
+        else { cut(0); i += 3; }
+        continue;
+      }
+      if (fn === "!") { // GS ! — magnitude: nibble alto = largura, baixo = altura
+        const n = code(i + 2);
+        st.w = Math.min((n >> 4) & 0x0f, 1) + 1;
+        st.h = Math.min(n & 0x0f, 1) + 1;
+        i += 3; continue;
+      }
+      if (fn === undefined) { i += 1; continue; }
+      if (fn === "k") { // barcode: pula até NUL (formato nul-terminado) ou 40 chars
+        const fim = s.indexOf("\0", i); i = fim === -1 ? i + 42 : fim + 1; continue;
+      }
+      i += 2; continue; // h, w, ( ... — best effort
+    }
+    if (c === "\n") { flush(); ops.push({ t: "l", text: "", w: 1, h: 1 }); i++; continue; }
+    if (c === "\r") { i++; continue; }
+    if (c === "\t") { put("    "); i++; continue; }
+    if (c < " ") { i++; continue; } // demais controles: ignora
+    put(c); i++;
+  }
+  flush();
+  return ops;
+}
+
+function hexDump(bytes) {
+  const linhas = [];
+  for (let o = 0; o < bytes.length; o += 16) {
+    const pedaco = bytes.slice(o, o + 16);
+    const hex = Array.from(pedaco, (b) => b.toString(16).padStart(2, "0")).join(" ");
+    const ascii = Array.from(pedaco, (b) => (b >= 0x20 && b < 0x7f ? String.fromCharCode(b) : ".")).join("");
+    linhas.push(o.toString(16).padStart(4, "0") + "  " + hex.padEnd(47) + "  " + ascii);
+  }
+  return linhas.join("\n");
+}
+
+/* =====================================================================
+ * Servidor DEMO — o contrato do épico rodando aqui dentro, espelhando o
+ * PrintDevicesController do S4: payload ESC/POS congelado na enfileiração
+ * (decisão 5), ordem do lote cozinha antes da guia (decisão 13), poll com
+ * jobs + config_version que é heartbeat do device, 404 em token vazio,
+ * report de impressoras substitutivo saneado (decisão 17) e logs de debug
+ * com os mesmos tetos do PrinterDebugLog (decisão 18).
+ * ===================================================================== */
+
+const demo = { jobs: [], configVersion: 0, lastSeen: null, polls: 0,
+               reported: null, reportedAt: null, debugLogs: [] };
+
+// Pedidos de exemplo (os mesmos campos do Order do Rails). O nome da guia de
+// entrega é Karen Esteves, como pedido na sessão anterior.
+function demoOrders() {
+  const hoje = hojeDM();
+  return [
+    {
+      n: "#1041", criado: `${hoje} 12:02`, fulfillment: "delivery",
+      customer: "Ana Beatriz", phone: "(11) 97777-2211",
+      address: { street: "Rua Bela Cintra", number: "45", complement: "", district: "Jardim Paulista", city: "São Paulo", state: "SP", cep: "01415-000" },
+      items: [
+        { q: 1, name: "Marmita G — Bife acebolado", unit: 29.9, obs: "" },
+        { q: 2, name: "Suco de laranja 500ml", unit: 9.5, obs: "" },
+      ],
+      obs: "Toque na campainha 3 vezes.",
+      payment: "Pix", changeFor: null, fee: 7.9,
+    },
+    {
+      n: "#1042", criado: `${hoje} 12:06`, fulfillment: "delivery",
+      customer: "Karen Esteves", phone: "(11) 98765-4321",
+      address: { street: "Rua das Palmeiras", number: "120", complement: "ap 42", district: "Jardim América", city: "São Paulo", state: "SP", cep: "01234-567" },
+      items: [
+        { q: 2, name: "Marmita P — Frango grelhado", unit: 24.9, obs: "" },
+        { q: 1, name: "Marmita G — Bife acebolado", unit: 29.9, obs: "sem cebola" },
+        { q: 1, name: "Coca-Cola lata", unit: 6.0, obs: "" },
+      ],
+      obs: "Portão azul — entregar na portaria.",
+      payment: "Dinheiro", changeFor: 100, fee: 7.9,
+    },
+    {
+      n: "#1043", criado: `${hoje} 12:08`, fulfillment: "pickup",
+      customer: "Carlos Lima", phone: "(11) 95555-1010",
+      address: null,
+      items: [
+        { q: 1, name: "Marmita G — Frango grelhado", unit: 29.9, obs: "" },
+        { q: 1, name: "Guaraná lata", unit: 5.5, obs: "" },
+      ],
+      obs: "", payment: "Cartão de crédito", changeFor: null, fee: 0,
+    },
+  ];
+}
+
+/* Builder ESC/POS do demo — o mesmo papel que o S2 (`app/values/esc_pos.rb`)
+ * vai renderizar no Rails: cabeçalho duplo, itens com obs, totais, e na guia
+ * o bloco ENTREGAR PARA em destaque. Corte GS V no fim (épico S0). */
+function buildComanda(order, kind, cfg) {
+  const cols = cfg.columns;
+  const out = [];
+  const p = (...ns) => out.push(...ns);
+  const txt = (s) => out.push(...encodeStr(s, cfg.codepage));
+  const sep = () => txt("-".repeat(cols) + "\n");
+  const fit = (s, n) => (s.length > n ? s.slice(0, Math.max(0, n - 1)) + "…" : s);
+  const duas = (esq, dir) => { // esquerda + direita na mesma linha de `cols`
+    const gap = cols - esq.length - dir.length;
+    txt(gap > 0 ? esq + " ".repeat(gap) + dir : fit(esq + " " + dir, cols));
+    p(10);
+  };
+  const total = order.items.reduce((s, it) => s + it.q * it.unit, 0);
+
+  p(0x1b, 0x40);                                   // ESC @ — init
+  p(0x1b, 0x61, 0x01);                             // ESC a 1 — centro
+  p(0x1b, 0x21, 0x30);                             // ESC ! — dupla altura+largura
+  txt((kind === "kitchen" ? "COZINHA" : "ENTREGA") + "\n");
+  p(0x1b, 0x21, 0x00, 0x1b, 0x61, 0x00);           // volta ao normal, à esquerda
+  sep();
+  duas(`Pedido ${order.n}`, order.criado);
+  txt(order.fulfillment === "delivery" ? "Entrega\n" : "Retirada no balcão\n"); p(10);
+  sep();
+
+  for (const it of order.items) {
+    txt(fit(`${String(it.q).padStart(2)}x ${it.name}`, cols) + "\n");
+    // obs de item só na via da cozinha (épico, decisão 13)
+    if (it.obs && kind === "kitchen") txt(fit(`  » ${it.obs}`, cols) + "\n");
+  }
+  sep();
+  duas("Total:", fmtBRL(total + (order.fulfillment === "delivery" ? order.fee : 0)));
+  txt(`Pagamento: ${order.payment}\n`);
+  if (order.changeFor) txt(`Levar troco para ${fmtBRL(order.changeFor)}\n`);
+  if (order.obs) { p(10); txt("Obs: " + fit(order.obs, cols - 5) + "\n"); }
+
+  if (kind === "delivery" && order.address) {
+    sep();
+    p(0x1b, 0x61, 0x01, 0x1b, 0x21, 0x20);        // centro, dupla altura
+    txt("ENTREGAR PARA\n");
+    txt(order.customer + "\n");
+    p(0x1b, 0x21, 0x00, 0x1b, 0x61, 0x00);
+    txt(order.phone + "\n");
+    p(10);
+    const a = order.address;
+    txt(`${a.street}, ${a.number}\n`);
+    if (a.complement) txt(a.complement + "\n");
+    txt(`${a.district}\n`);
+    txt(`${a.city} – ${a.state}\n`);
+    txt(`CEP ${a.cep}\n`);
+    duas("Taxa de entrega:", fmtBRL(order.fee));
+  }
+
+  p(10);
+  p(0x1b, 0x61, 0x01);                            // centro
+  txt(`Localissimo · pedido ${order.n}\n`);
+  p(0x1b, 0x61, 0x00);
+  if (cfg.auto_cut) { p(0x1b, 0x64, 0x02); p(0x1d, 0x56, 0x00); }  // feed 2 + GS V (corte)
+  else p(0x1b, 0x64, 0x05);                                        // sem corte: só alimenta
+  return new Uint8Array(out);
+}
+
+function demoEnfileira() {
+  const cfg = demoConfig();
+  demo.configVersion = Date.now();
+  demo.jobs = [];
+  let id = 31;
+  for (const order of demoOrders()) {
+    const kinds = order.fulfillment === "delivery" ? ["kitchen", "delivery"] : ["kitchen"];
+    for (const kind of kinds) {
+      demo.jobs.push({
+        id: id++,
+        kind,
+        status: "pending",
+        criado: order.criado,
+        order: order.n,
+        customer: order.customer,
+        payload: btoa(String.fromCharCode(...buildComanda(order, kind, cfg))),
+      });
+    }
+  }
+}
+
+function demoConfig() {
+  // Mesma hash do Business#impressora_config_payload no Rails: configured é
+  // COMPLETUDE (review S4), config_version é ISO8601, debug_mode define quem
+  // loga (decisão 18).
+  return {
+    configured: true,
+    name: "Cozinha – Tomate MDK-080",
+    connection: "network",
+    host: "192.168.0.50",
+    port: 9100,
+    printer_name: "POS-80 (USB)",
+    codepage: state.demoCp,
+    columns: Number(state.demoCols),
+    auto_cut: state.demoCut,
+    poll_interval: Number(state.interval) || 3,
+    debug_mode: !!state.demoDebug,
+    config_version: new Date(demo.configVersion).toISOString(),
+  };
+}
+
+// Saneação do report — mesmos tetos do PrintDevice no Rails: máx. 50
+// impressoras, máx. 20 chaves por entrada (≤ 40 chars), valores
+// stringificados (≤ 500 chars), entrada sem "name" é descartada.
+// (O Array(report) do Ruby achata/envolve; em JS, Array(x) com um array
+// o ENVELOPA — por isso o Array.isArray abaixo, não Array(report || []).)
+function saneiaReport(report) {
+  const lista = Array.isArray(report) ? report : (report == null || report === "" ? [] : [report]);
+  const limpo = [];
+  for (const entry of lista.slice(0, 50)) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const pares = {};
+    let i = 0;
+    for (const [chave, valor] of Object.entries(entry)) {
+      if (i++ >= 20) break;
+      pares[String(chave).trim().slice(0, 40)] = String(valor ?? "").trim().slice(0, 500);
+    }
+    if (pares.name) limpo.push(pares);
+  }
+  return limpo;
+}
+
+// Saneação dos entries — mesmos tetos do PrinterDebugLog: máx. 200 strings
+// de ≤ 2000 chars, em branco fora.
+function saneiaEntries(entries) {
+  return (Array.isArray(entries) ? entries : [])
+    .slice(0, 200)
+    .map((e) => String(e ?? "").trim().slice(0, 2000))
+    .filter(Boolean);
+}
+
+// Fetch fake com a mesma forma de resposta do fetch real. Como no Rails,
+// o heartbeat (last_seen) só mexe em request autenticada bem-sucedida —
+// 404 de token rejeitado não conta.
+function demoFetch(method, path, body) {
+  if (path === "/impressora/config" && method === "GET") {
+    demo.lastSeen = Date.now(); demo.polls++;
+    return Promise.resolve({ status: 200, json: demoConfig() });
+  }
+  if (path === "/impressora/jobs" && method === "GET") {
+    demo.lastSeen = Date.now(); demo.polls++;
+    const jobs = demo.jobs
+      .filter((j) => j.status === "pending")
+      .sort((a, b) => a.id - b.id) // servidor garante a ordem (decisão 13)
+      .map(({ id, kind, payload }) => ({ id, kind, payload }));
+    // Rails devolve a config inteira mesclada com os jobs — o tester
+    // consome jobs + config_version de dentro dela do mesmo jeito.
+    return Promise.resolve({ status: 200, json: { ...demoConfig(), jobs } });
+  }
+  const ack = path.match(/^\/impressora\/jobs\/(\d+)\/ack$/);
+  if (ack && method === "POST") {
+    const job = demo.jobs.find((j) => j.id === Number(ack[1]));
+    if (job) job.status = "printed";
+    demo.lastSeen = Date.now(); demo.polls++;
+    return Promise.resolve({
+      status: 200,
+      json: { pending: demo.jobs.filter((j) => j.status === "pending").length },
+    });
+  }
+  if (path === "/impressora/printers" && method === "POST") {
+    demo.lastSeen = Date.now(); demo.polls++;
+    demo.reported = saneiaReport(body && body.printers);
+    demo.reportedAt = new Date().toISOString();
+    return Promise.resolve({ status: 200, json: { stored: demo.reported.length } });
+  }
+  if (path === "/impressora/logs" && method === "POST") {
+    demo.lastSeen = Date.now(); demo.polls++;
+    const entries = saneiaEntries(body && body.entries);
+    if (entries.length) {
+      demo.debugLogs.push({ at: new Date().toISOString(), entries });
+      demo.debugLogs = demo.debugLogs.slice(-300); // KEEP_ROWS do Rails
+    }
+    return Promise.resolve({ status: 200, json: { stored: entries.length } });
+  }
+  return Promise.resolve({ status: 404, json: null });
+}
+
+/* =====================================================================
+ * Cliente do tester — mesmo contrato do Client em client.go
+ * ===================================================================== */
+
+function serverInfo() {
+  const kind = state.server;
+  if (kind === "demo") return { kind, base: "demo" };
+  const base = (kind === "local" ? state.urlLocal : state.urlProd).replace(/\/+$/, "");
+  const token = kind === "local" ? state.tokenLocal : state.tokenProd;
+  return { kind, base, token };
+}
+
+async function api(method, path, body) {
+  const { kind, base, token } = serverInfo();
+  const t0 = performance.now();
+  try {
+    if (kind === "demo") {
+      const r = await demoFetch(method, path, body);
+      if (r.status >= 200 && r.status < 300) ultimoContato = Date.now(); // heartbeat
+      return { status: r.status, ms: performance.now() - t0, body: r.json === null ? "" : JSON.stringify(r.json, null, 1), parsed: r.json };
+    }
+    const resp = await fetch(base + path, {
+      method,
+      headers: Object.assign(
+        { Authorization: "Bearer " + token, Accept: "application/json" },
+        body !== undefined ? { "Content-Type": "application/json" } : {},
+      ),
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+    const texto = await resp.text();
+    let parsed = null;
+    try { parsed = JSON.parse(texto); } catch { /* HTML de erro do Rails etc. */ }
+    if (resp.status >= 200 && resp.status < 300) ultimoContato = Date.now(); // heartbeat: toda request autenticada conta
+    return { status: resp.status, ms: performance.now() - t0, body: texto.slice(0, 2500), parsed };
+  } catch (e) {
+    return { status: 0, ms: performance.now() - t0, body: String(e), parsed: null, rede: true };
+  }
+}
+
+/* ---------------- log de requests ---------------- */
+
+function logReq(req) {
+  const log = $("log");
+  const vazio = log.querySelector(".vazio");
+  if (vazio) vazio.remove();
+
+  const el = document.createElement("details");
+  el.className = "req" + (req.status === 0 || req.status >= 400 ? " erro" : "");
+  const cls = req.status === 0 ? "sx" : req.status < 300 ? "s2" : req.status < 500 ? "s4" : "sx";
+  el.innerHTML =
+    `<summary><span class="metodo ${req.method.toLowerCase()}">${req.method}</span>` +
+    `<span class="caminho">${req.path}</span>` +
+    `<span class="status ${cls}">${req.status === 0 ? "rede" : req.status}</span>` +
+    `<span class="tempo">${Math.round(req.ms)}ms</span></summary>` +
+    `<pre></pre>`;
+  const pre = el.querySelector("pre");
+  pre.textContent = req.body || "(corpo vazio)";
+
+  // Dicas contextuais — a passada com req.dica vence; depois os tropeços
+  // conhecidos do modo real:
+  const dica = (texto) => {
+    const d = document.createElement("div");
+    d.className = "dica";
+    d.textContent = texto;
+    el.appendChild(d);
+  };
+  if (req.dica) {
+    dica(req.dica);
+  } else if (req.status === 404) {
+    dica("404 indistinto por contrato (S4): token inválido, flag orders.comandas desligada ou job de outro negócio devolvem o MESMO 404 — a resposta nunca revela o que existe. Endpoints vivem na branch feat/comandas-termicas (S0–S4 feitos, sem merge na main).");
+  } else if (req.rede) {
+    dica("Falha de rede — provável CORS: esta página roda em file:// (Origin null) e o Rails libera OPTIONS/CORS apenas nos endpoints /impressora (middleware PrintAgentCors do S4). O modo Demo não precisa de rede.");
+  } else if (req.path === "/impressora/config" && req.status === 200 && state.server === "demo" && !demo.reportedAt) {
+    dica("Fluxo do boot do agente (decisão 17): o POST /impressora/printers (passo 2, report do spooler) vem ANTES do primeiro GET config (passo 3) — o agente só busca a config depois do 1º POST bem-sucedido.");
+  }
+  log.prepend(el);
+  while (log.children.length > 100) log.lastChild.remove();
+}
+
+// Zera o log e o estado de poll — página como recém-aberta: log vazio com a
+// mensagem do estado inicial, heartbeat "sem poll ainda", contadores a zero.
+// O papel fica de pé (tem o próprio "limpar papel"); auto-poll segue ligado,
+// que é o que aconteceria num F5 com o checkbox marcado.
+function limpaRequests() {
+  $("log").innerHTML = '<div class="vazio">sem requests ainda</div>';
+  pollCount = 0;
+  ultimoContato = null;
+  ultimoPending = null;
+  ultimaConfigVersion = null;
+  $("hb").innerHTML = '<span class="ponto">●</span> sem poll ainda';
+}
+
+/* ---------------- papel ---------------- */
+
+// limpa as comandas da tela e deixa a mensagem do estado vazio. Os jobs que
+// seguem pending no servidor voltam no próximo poll (at-least-once, decisão 14)
+// — a mensagem existe exatamente para explicar isso, senão o "limpar" parece
+// botão quebrado.
+function limpaPapel(msg) {
+  $("papers").querySelectorAll(".comanda").forEach((el) => el.remove());
+  if (!$("papers").querySelector(".vazio")) {
+    $("papers").innerHTML = `<div class="vazio">${msg}</div>`;
+  }
+}
+
+let cfgRender = { columns: 48, codepage: "UTF-8" }; // vem do GET /config quando disponível
+
+function base64Bytes(b64) {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function addPaper(job) {
+  const papers = $("papers");
+  const vazio = papers.querySelector(".vazio");
+  if (vazio) vazio.remove();
+
+  const bytes = base64Bytes(job.payload);
+  const ops = decodeEscpos(bytes, cfgRender.codepage);
+
+  const el = document.createElement("article");
+  el.className = "comanda";
+  el.dataset.jobId = job.id;
+
+  const barra = document.createElement("div");
+  barra.className = "barra";
+  barra.innerHTML =
+    `<span class="badge ${job.kind}">${job.kind === "kitchen" ? "COZINHA" : "ENTREGA"}</span>` +
+    `<span class="jobid">job #${job.id}${job.order ? " · " + job.order : ""}${job.customer ? " · " + job.customer : ""}</span>` +
+    `<span class="st">pendente</span>` +
+    `<span class="acoes">` +
+    `<label class="chk" title="marcado: ACK automático e ACK pendentes incluem este job. desmarcado: segue pending no servidor e volta no próximo poll (at-least-once, decisão 14)">` +
+    `<input type="checkbox" class="chkAck" checked>ack</label>` +
+    `<button class="ack" title="ACK manual — manda mesmo com o checkbox desmarcado">ACK</button>` +
+    `<button class="limpar">✕</button></span>`;
+  el.appendChild(barra);
+
+  const papel = document.createElement("div");
+  papel.className = "papel";
+  const largura = 280; // px úteis do papel
+  papel.style.setProperty("--fs", (largura / (cfgRender.columns * 0.62)).toFixed(2) + "px");
+
+  for (const op of ops) {
+    if (op.t === "c") {
+      const corte = document.createElement("div");
+      corte.className = "corte";
+      papel.appendChild(corte);
+      continue;
+    }
+    if (op.t === "f") {
+      for (let k = 0; k < Math.min(op.n, 10); k++) {
+        const branco = document.createElement("div");
+        branco.className = "linha blank";
+        papel.appendChild(branco);
+      }
+      continue;
+    }
+    const div = document.createElement("div");
+    div.className = "linha" + (op.text === "" ? " blank" : "");
+    div.textContent = op.text || " ";
+    div.style.fontSize = `calc(var(--fs) * ${op.h})`;
+    div.style.fontWeight = op.bold ? "700" : "400";
+    div.style.textDecoration = op.u ? "underline" : "none";
+    if (op.w > 1) { div.classList.add("dupla-w"); div.style.setProperty("--w", op.w); }
+    if (op.align === 1) { div.style.textAlign = "center"; div.style.transformOrigin = "center"; }
+    else if (op.align === 2) { div.style.textAlign = "right"; div.style.transformOrigin = "right"; }
+    else div.style.transformOrigin = "left";
+    papel.appendChild(div);
+  }
+
+  const det = document.createElement("details");
+  det.className = "bytes";
+  det.innerHTML = "<summary>bytes ESC/POS</summary><pre></pre>";
+  det.querySelector("pre").textContent = hexDump(bytes);
+  papel.appendChild(det);
+
+  el.appendChild(papel);
+  barra.querySelector(".ack").addEventListener("click", () => ackJob(job.id, el));
+  barra.querySelector(".limpar").addEventListener("click", () => el.remove());
+  papers.appendChild(el);
+  el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function marcaImpresso(jobId) {
+  const el = $("papers").querySelector(`.comanda[data-job-id="${jobId}"]`);
+  if (!el) return;
+  const st = el.querySelector(".st");
+  st.textContent = "impresso ✓";
+  st.classList.add("ok");
+  el.querySelector(".ack").disabled = true;
+}
+
+/* ---------------- ações ---------------- */
+
+let ultimaConfigVersion = null;
+let pollCount = 0;
+let ultimoContato = null; // última request autenticada bem-sucedida — toda conta como heartbeat
+let ultimoPending = null; // {pending} do ack / tamanho do lote do poll (régua do badge, decisão 10)
+
+async function fetchConfig() {
+  const r = await api("GET", "/impressora/config");
+  logReq({ method: "GET", path: "/impressora/config", ...r });
+  if (r.status === 200 && r.parsed) {
+    const cfg = r.parsed;
+    cfgRender = {
+      columns: Number(cfg.columns) || 48,
+      codepage: cfg.codepage || "UTF-8",
+    };
+    if (cfg.config_version) ultimaConfigVersion = String(cfg.config_version);
+    const conexao = cfg.connection === "usb"
+      ? `usb · ${cfg.printer_name || "?"}`
+      : cfg.connection === "network"
+        ? `rede · ${cfg.host || "?"}:${cfg.port || "?"}`
+        : null;
+    $("hb").innerHTML = `<span class="ponto viva">●</span> ${[
+      cfg.name || "impressora",
+      conexao,
+      `${cfg.columns || "?"} col`,
+      cfg.codepage || "?",
+      `corte: ${cfg.auto_cut ? "sim" : "não"}`,
+      `debug: ${cfg.debug_mode ? "on" : "off"}`,
+      `poll ${cfg.poll_interval || "?"}s`,
+    ].filter(Boolean).join(" · ")}`;
+    if (cfg.configured === false) {
+      logReq({
+        method: "GET", path: "(configured: false)", status: 200, ms: 0,
+        body: "Printer inexistente ou incompleta — configured é COMPLETUDE, não existência (review S4). O agente espera e não escreve em lugar nenhum; complete o formulário da impressora no painel admin.",
+      });
+    }
+    if (state.server === "demo") demoReset();
+  }
+  return r;
+}
+
+async function poll() {
+  const r = await api("GET", "/impressora/jobs");
+  logReq({ method: "GET", path: "/impressora/jobs", ...r });
+  pollCount++;
+
+  if (r.status !== 200 || !r.parsed || !Array.isArray(r.parsed.jobs)) { atualizaHb(); return; }
+
+  // o poll também anuncia config_version — mudou, refetch (épico, decisão 15)
+  const versao = r.parsed.config_version && String(r.parsed.config_version);
+  if (versao && ultimaConfigVersion && versao !== ultimaConfigVersion) {
+    logReq({ method: "GET", path: "(refetch: config_version mudou)", status: 0, ms: 0, body: "config nova anunciada no poll — refetch da config (decisão 15)" });
+    await fetchConfig();
+  } else if (versao && !ultimaConfigVersion) {
+    ultimaConfigVersion = versao;
+  }
+
+  const jobs = r.parsed.jobs;
+  ultimoPending = jobs.length; // o poll devolve TODO o drenável — é a régua do badge (decisão 10)
+  for (const job of jobs) addPaper(job);
+  if (state.autoAck) {
+    // ACK automático só nas comandas com o checkbox "ack" marcado — a
+    // desmarcada segue pending no servidor e volta no próximo poll
+    // (at-least-once, decisão 14): é assim que se testa a redelivery.
+    // O checkbox vale por JOB: na redelivery (cartão duplicado), quem fala
+    // é o 1º cartão — o novo aparece só para mostrar que o servidor reenviou.
+    for (const job of jobs) {
+      const el = $("papers").querySelector(`.comanda[data-job-id="${job.id}"]`);
+      if (el?.querySelector(".chkAck")?.checked) await ackJob(job.id);
+    }
+  }
+  atualizaHb();
+}
+
+async function ackJob(id, el) {
+  const r = await api("POST", `/impressora/jobs/${id}/ack`);
+  logReq({ method: "POST", path: `/impressora/jobs/${id}/ack`, ...r });
+  if (r.status >= 200 && r.status < 300) {
+    // o ack responde {pending} — a mesma régua operacional que o badge do kanban conta (decisão 10)
+    if (r.parsed && typeof r.parsed.pending === "number") ultimoPending = r.parsed.pending;
+    if (el) { marcaImpresso(id); return; }
+    marcaImpresso(id);
+  }
+}
+
+/* POST /impressora/printers (decisão 17): o payload vem do textarea —
+ * editável para testar a saneação (entrada sem "name", mais de 50, chaves
+ * longas...). O demo e o Rails respondem {stored} com o que sobreviveu. */
+async function enviaPrinters() {
+  let body;
+  try {
+    body = JSON.parse($("taPrinters").value);
+  } catch {
+    logReq({ method: "POST", path: "/impressora/printers", status: 0, ms: 0,
+             body: "(não enviado — JSON do payload inválido)",
+             dica: "JSON inválido no textarea do report — corrija e reenvie." });
+    return;
+  }
+  const r = await api("POST", "/impressora/printers", body);
+  const enviadas = Array.isArray(body.printers) ? body.printers.length : 0;
+  let dica;
+  if (r.status === 200 && r.parsed && typeof r.parsed.stored === "number" && r.parsed.stored < enviadas) {
+    dica = `saneação cortou ${enviadas - r.parsed.stored} entrada(s) — sem "name" é descartada; teto de 50 impressoras, 20 chaves, 500 chars (decisão 17). Snapshot substitutivo: o report anterior foi vencido.`;
+  }
+  logReq({ method: "POST", path: "/impressora/printers", ...r, dica });
+}
+
+/* POST /impressora/logs (decisão 18): {"entries": [...]} — stored: 0 quando
+ * nada sobrevive à saneação (POST vazio não cria linha morta). */
+async function enviaLogs() {
+  let body;
+  try {
+    body = JSON.parse($("taLogs").value);
+  } catch {
+    logReq({ method: "POST", path: "/impressora/logs", status: 0, ms: 0,
+             body: "(não enviado — JSON do payload inválido)",
+             dica: "JSON inválido no textarea dos logs — corrija e reenvie." });
+    return;
+  }
+  const r = await api("POST", "/impressora/logs", body);
+  let dica;
+  if (r.status === 200 && r.parsed && r.parsed.stored === 0) {
+    dica = "stored: 0 — nada sobreviveu à saneação (entries vazio ou só em branco): o POST não cria linha morta (decisão 18).";
+  }
+  logReq({ method: "POST", path: "/impressora/logs", ...r, dica });
+}
+
+function ackPendentes() {
+  const pendentes = [...$("papers").querySelectorAll(".comanda")]
+    .filter((el) => el.querySelector(".st").textContent === "pendente")
+    .filter((el) => el.querySelector(".chkAck").checked); // desmarcada: fora do ACK em lote
+  pendentes.forEach((el) => ackJob(Number(el.dataset.jobId), el));
+}
+
+function atualizaHb() {
+  if (!ultimoContato) return;
+  const s = Math.round((Date.now() - ultimoContato) / 1000);
+  const fila = ultimoPending === null ? "" : ` · fila: ${ultimoPending} pendente(s)`;
+  // régua do card Impressora do owner: PrintDevice.OFFLINE_AFTER = 1 min
+  // (S4 acréscimo: era 2 min) — mais de 1 min sem poll = ponto vermelho
+  $("hb").innerHTML = `<span class="ponto viva">●</span> último contato há ${s}s · ${pollCount} polls${fila} — no card Impressora: ${s > 60 ? "offline desde HH:MM" : "conectada"} (régua 1 min)`;
+}
+
+/* ---------------- poll automático ---------------- */
+
+let timerPoll = null;
+function ligaAutoPoll() {
+  desligaAutoPoll();
+  const tick = async () => {
+    if (!state.autoPoll) return;
+    await poll();
+    if (state.autoPoll) timerPoll = setTimeout(tick, (Number(state.interval) || 3) * 1000);
+  };
+  tick();
+}
+function desligaAutoPoll() { if (timerPoll) clearTimeout(timerPoll); timerPoll = null; }
+
+/* ---------------- demo ---------------- */
+
+function demoReset() {
+  demoEnfileira();
+  limpaPapel("Demo re-enfileirado. Dê um poll.");
+}
+
+/* ---------------- boot ---------------- */
+
+function boot() {
+  // estado → controles
+  $("url").value = state.server === "localissimo" ? state.urlProd : state.urlLocal;
+  $("token").value = state.server === "localissimo" ? state.tokenProd : state.tokenLocal;
+  document.querySelector(`input[name=server][value="${state.server}"]`).checked = true;
+  $("chkAuto").checked = state.autoPoll;
+  $("chkAutoAck").checked = state.autoAck;
+  $("interval").value = state.interval;
+  $("dCols").value = String(state.demoCols);
+  $("dCp").value = state.demoCp;
+  $("dCut").checked = state.demoCut;
+  $("dDebug").checked = !!state.demoDebug;
+
+  const ehDemo = () => state.server === "demo";
+  const atualizaCampos = () => {
+    $("url").style.display = ehDemo() ? "none" : "";
+    $("token").style.display = ehDemo() ? "none" : "";
+    $("demoCfg").style.display = ehDemo() ? "flex" : "none";
+  };
+  atualizaCampos();
+
+  // troca de servidor
+  $("srv").addEventListener("change", (e) => {
+    state.server = e.target.value;
+    if (state.server === "local") { $("url").value = state.urlLocal; $("token").value = state.tokenLocal; }
+    if (state.server === "localissimo") { $("url").value = state.urlProd; $("token").value = state.tokenProd; }
+    cfgRender = { columns: 48, codepage: "UTF-8" };
+    ultimaConfigVersion = null;
+    $("hb").innerHTML = '<span class="ponto">●</span> sem poll ainda';
+    atualizaCampos();
+    saveState();
+    if (state.autoPoll) ligaAutoPoll();
+  });
+
+  $("url").addEventListener("change", () => {
+    if (state.server === "local") state.urlLocal = $("url").value.trim();
+    if (state.server === "localissimo") state.urlProd = $("url").value.trim();
+    saveState();
+  });
+  $("token").addEventListener("change", () => {
+    if (state.server === "local") state.tokenLocal = $("token").value.trim();
+    if (state.server === "localissimo") state.tokenProd = $("token").value.trim();
+    saveState();
+  });
+
+  $("bConfig").addEventListener("click", fetchConfig);
+  $("bPoll").addEventListener("click", poll);
+  $("bAcks").addEventListener("click", ackPendentes);
+  $("bPrinters").addEventListener("click", enviaPrinters);
+  $("bLogs").addEventListener("click", enviaLogs);
+  $("bClearReqs").addEventListener("click", limpaRequests);
+  $("bClear").addEventListener("click", () => {
+    limpaPapel(
+      "Papel limpo — mas jobs que seguem <em>pending</em> no servidor " +
+      "<strong>voltam no próximo poll</strong> (at-least-once, decisão 14). " +
+      "Dê ACK para baixá-los de vez.",
+    );
+  });
+  $("bDemoReset").addEventListener("click", demoReset);
+
+  $("chkAuto").addEventListener("change", (e) => {
+    state.autoPoll = e.target.checked; saveState();
+    if (state.autoPoll) ligaAutoPoll(); else desligaAutoPoll();
+  });
+  $("chkAutoAck").addEventListener("change", (e) => { state.autoAck = e.target.checked; saveState(); });
+  $("interval").addEventListener("change", (e) => {
+    state.interval = Math.max(1, Number(e.target.value) || 3);
+    e.target.value = state.interval; saveState();
+    if (state.autoPoll) ligaAutoPoll();
+  });
+  $("dCols").addEventListener("change", (e) => { state.demoCols = Number(e.target.value); saveState(); });
+  $("dCp").addEventListener("change", (e) => { state.demoCp = e.target.value; saveState(); });
+  $("dCut").addEventListener("change", (e) => { state.demoCut = e.target.checked; saveState(); });
+  $("dDebug").addEventListener("change", (e) => { state.demoDebug = e.target.checked; saveState(); });
+
+  demoEnfileira(); // demo pronto desde já — o poll é que drena
+
+  // relojinho do heartbeat ("último contato há Xs", régua do card Impressora: >1min = offline)
+  setInterval(atualizaHb, 5000);
+}
+
+// Sem document (teste no node via vm) — só definições, sem boot.
+if (typeof document !== "undefined" && typeof window !== "undefined") {
+  window.addEventListener("DOMContentLoaded", boot);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+# segredo local — nunca versionar (mesma razão do master.key)
+token.txt
+config.json
+
+# runtime do agente (gerados na pasta do binário)
+agent.log
+agent.log.1
+agent.lock
+printer-agent.download
+printer-agent.old
+
+# binários de build (dev na raiz; releases em dist/)
+dist/
+printer-agent
+printer-agent.exe
+localissimo-print-agent
+localissimo-print-agent.exe
+*.test
