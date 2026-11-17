@@ -239,6 +239,28 @@ func TestPrinterStatusText(t *testing.T) {
 	if got := agent.PrinterStatusText(4096); got != "indisponível" {
 		t.Fatalf("bit único: %s", got)
 	}
+	// Bits altos conforme o winspool.h do SDK — o mapeamento antigo dizia
+	// "tampa aberta"/"intervenção"/"offline" nos bits errados (verificado
+	// no header; bit errado vira diagnóstico errado no painel do balcão).
+	bitsAltos := []struct {
+		status uint32
+		quer   string
+	}{
+		{0x00100000, "intervenção do usuário"},      // USER_INTERVENTION
+		{0x00200000, "sem memória"},                 // OUT_OF_MEMORY
+		{0x00400000, "tampa aberta"},                // DOOR_OPEN (antes não mapeado)
+		{0x00800000, "servidor de impressão sumiu"}, // SERVER_UNKNOWN
+	}
+	for _, c := range bitsAltos {
+		if got := agent.PrinterStatusText(c.status); got != c.quer {
+			t.Errorf("status 0x%08x: quero %q, veio %q", c.status, c.quer, got)
+		}
+	}
+	// IO_ACTIVE fica de fora de propósito (atividade normal) — bit só ele
+	// cai no bruto 0x...
+	if got := agent.PrinterStatusText(0x00000100); got != "0x100" {
+		t.Errorf("bit fora da tabela deveria vir bruto: %q", got)
+	}
 }
 
 func TestBuildReportBody(t *testing.T) {
@@ -263,5 +285,108 @@ func TestBuildReportBody(t *testing.T) {
 	hostname, _ := os.Hostname()
 	if body["hostname"] != hostname {
 		t.Fatalf("hostname: %#v vs %q", body["hostname"], hostname)
+	}
+}
+
+// Resumo da coleta (epic §4 com evidências): o log do boot tem que explicar
+// a diferença entre coletado do OS e enviado no report — coletou 4, filtro
+// tirou 3 (2 virtuais + 1 sem nome), enviou 1, e o nome de cada descartada
+// aparece (suporte sabe POR QUE a térmica não está na lista do painel).
+func TestBuildDiscoveryResumeDescreveFiltro(t *testing.T) {
+	raw := []map[string]string{
+		{"name": "POS-80", "PortaNome": "USB001", "driver": "POS-80 Driver"},
+		{"name": "Microsoft Print to PDF", "PortaNome": "PORTPROMPT:", "driver": "Microsoft Print To PDF"},
+		{"name": "OneNote for Windows 10"},
+		{"driver": "Fantasma"}, // sem name
+	}
+	res := agent.BuildDiscoveryResume(raw, []string{"spooler: 4 impressora(s)"})
+	if res.RawCount != 4 {
+		t.Fatalf("RawCount: %d", res.RawCount)
+	}
+	if len(res.Kept) != 1 || res.Kept[0]["name"] != "POS-80" {
+		t.Fatalf("Kept: %#v", res.Kept)
+	}
+	if len(res.Dropped) != 3 {
+		t.Fatalf("esperava 3 descartadas (2 virtuais + 1 sem nome), veio %v", res.Dropped)
+	}
+	joined := strings.Join(res.Notes, "\n")
+	if !strings.Contains(joined, "spooler: 4 impressora(s)") {
+		t.Fatalf("nota do OS perdida: %s", joined)
+	}
+	if !strings.Contains(joined, "filtro do report descartou 3") ||
+		!strings.Contains(joined, "Microsoft Print to PDF") ||
+		!strings.Contains(joined, "OneNote for Windows 10") ||
+		!strings.Contains(joined, "(sem nome)") {
+		t.Fatalf("nota de filtro incompleta: %s", joined)
+	}
+	if strings.Contains(joined, "nenhuma impressora encontrada") {
+		t.Fatalf("raw>0 não pode ganhar nota de vazio: %s", joined)
+	}
+}
+
+// Coleta vazia NUNCA é silenciosa: a nota do OS (spooler morto, sem lpstat,
+// EnumPrinters falhou…) entra e a dica de ação completa o quadro.
+func TestBuildDiscoveryResumeVazioExplica(t *testing.T) {
+	res := agent.BuildDiscoveryResume(nil, []string{"EnumPrinters falhou: spooler parado"})
+	if res.RawCount != 0 || len(res.Kept) != 0 || len(res.Dropped) != 0 {
+		t.Fatalf("resumo de coleta vazia: %#v", res)
+	}
+	joined := strings.Join(res.Notes, "\n")
+	if !strings.Contains(joined, "EnumPrinters falhou") {
+		t.Fatalf("nota do OS perdida: %s", joined)
+	}
+	if !strings.Contains(joined, "nenhuma impressora encontrada") ||
+		!strings.Contains(joined, "reinicie o agente") {
+		t.Fatalf("falta dica de ação no vazio: %s", joined)
+	}
+}
+
+// Filtro com memória: descartadas listadas, nenhuma descartada → nenhuma
+// nota extra de filtro.
+func TestFilterAndRankDetails(t *testing.T) {
+	raw := []map[string]string{
+		{"name": "POS-80", "PortaNome": "USB001"},
+		{"name": "Microsoft XPS Document Writer", "PortaNome": "PORTPROMPT:"},
+	}
+	kept, dropped := agent.FilterAndRankDetails(raw)
+	if len(kept) != 1 || kept[0]["name"] != "POS-80" {
+		t.Fatalf("kept: %#v", kept)
+	}
+	if len(dropped) != 1 || dropped[0] != "Microsoft XPS Document Writer" {
+		t.Fatalf("dropped: %v", dropped)
+	}
+	kept2, dropped2 := agent.FilterAndRankDetails([]map[string]string{{"name": "Só uma"}})
+	if len(kept2) != 1 || len(dropped2) != 0 {
+		t.Fatalf("sem descarte não ganha dropped: %v", dropped2)
+	}
+}
+
+// FilterAndRank delega no FilterAndRankDetails: um filtro só — o "dropped"
+// do log nunca diverge do snapshot que o report leva.
+func TestFilterAndRankDelegaNoDetails(t *testing.T) {
+	raw := []map[string]string{
+		{"name": "Tomate MDK-080", "PortaNome": "USB001", "driver": "printqueue.inf"},
+		{"name": "Microsoft Print to PDF", "PortaNome": "PORTPROMPT:", "driver": "pdf"},
+		{"name": "  ", "PortaNome": "x", "driver": "y"}, // sem nome → descartada
+		nil,
+		{"name": "HP DeskJet", "PortaNome": "USB002", "driver": "hp"},
+	}
+	kept, dropped := agent.FilterAndRankDetails(raw)
+	viaSimples := agent.FilterAndRank(raw)
+	if len(viaSimples) != len(kept) {
+		t.Fatalf("FilterAndRank divergiu do Details: %d vs %d", len(viaSimples), len(kept))
+	}
+	for i := range kept {
+		if viaSimples[i]["name"] != kept[i]["name"] {
+			t.Fatalf("ordem/conteúdo divergiu na %d: %q vs %q", i, viaSimples[i]["name"], kept[i]["name"])
+		}
+	}
+	// Descartadas na ordem de varredura: a PDF e a sem-nome (nil não vira linha).
+	if len(dropped) != 2 || dropped[0] != "Microsoft Print to PDF" || dropped[1] != "(sem nome)" {
+		t.Fatalf("dropped: %v", dropped)
+	}
+	// Térmica primeiro (score: usb+mdk > nada) e o teto de 50 não afeta 2.
+	if len(kept) != 2 || kept[0]["name"] != "Tomate MDK-080" || kept[1]["name"] != "HP DeskJet" {
+		t.Fatalf("kept: %v", kept)
 	}
 }

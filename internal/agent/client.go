@@ -38,7 +38,14 @@ type HTTPError struct {
 }
 
 func (e *HTTPError) Error() string {
-	return fmt.Sprintf("http %d: %.300s", e.Status, e.Body)
+	return fmt.Sprintf("http %d: %.300s", e.Status, emUmaLinha(e.Body))
+}
+
+// emUmaLinha: corpo de erro (página HTML do Rails, JSON com quebra…) vira
+// UMA linha — sem isso a "linha" do agent.log quebra em dezenas de linhas
+// sem timestamp (páginas de exceção do Rails têm \r\n no head inteiro).
+func emUmaLinha(s string) string {
+	return strings.NewReplacer("\r", " ", "\n", " ", "\t", " ").Replace(s)
 }
 
 // UpdateOffer é a oferta de auto-update embutida na config do poll

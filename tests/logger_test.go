@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// Rotação do agent.log (epic §3): ~1 MB, mantém 1 anterior — fecha →
+// Rotação do agent.log (epic §3): ~10 MB, mantém 1 anterior — fecha →
 // renomeia → reabre.
 func TestLoggerRotacao(t *testing.T) {
 	dir := t.TempDir()
@@ -20,13 +20,13 @@ func TestLoggerRotacao(t *testing.T) {
 	}
 	defer l.Close()
 
-	// Estoura 1 MB de verdade (rápido e sem mocks).
-	big := strings.Repeat("x", 4096) + "\n"
-	for i := 0; i < 300; i++ { // ~1.2 MB
+	// Estoura 10 MB de verdade (rápido e sem mocks).
+	big := strings.Repeat("x", 8192) + "\n"
+	for i := 0; i < 1500; i++ { // ~12.3 MB
 		l.Printf("%05d %s", i, big)
 	}
 	if _, err := os.Stat(path + ".1"); err != nil {
-		t.Fatalf("agent.log.1 deveria existir após passar de 1 MB: %v", err)
+		t.Fatalf("agent.log.1 deveria existir após passar de 10 MB: %v", err)
 	}
 	st, err := os.Stat(path)
 	if err != nil {
@@ -51,6 +51,11 @@ func TestLoggerRotacao(t *testing.T) {
 	if !strings.Contains(string(data2), "linha pós-rotação") {
 		t.Fatalf("escrita pós-rotação perdida")
 	}
+	// O arquivo novo abre com o marcador de rotação (quando/por que o
+	// histórico virou agent.log.1).
+	if !strings.Contains(string(data2), "log rotacionado") {
+		t.Fatalf("marcador de rotação ausente no arquivo novo: %q", string(data2[:min(len(data2), 120)]))
+	}
 }
 
 // Rename falhou (arquivo preso — típico Windows) → segue escrevendo no
@@ -68,8 +73,8 @@ func TestLoggerRotacaoFalhaTolerada(t *testing.T) {
 	if err := os.Mkdir(path+".1", 0o755); err != nil {
 		t.Fatal(err)
 	}
-	big := strings.Repeat("y", 4096) + "\n"
-	for i := 0; i < 300; i++ { // passa do teto com a rotação falhando
+	big := strings.Repeat("y", 8192) + "\n"
+	for i := 0; i < 1500; i++ { // ~12.3 MB: passa do teto com a rotação falhando
 		l.Printf("%05d %s", i, big)
 	}
 	if _, err := os.Stat(path); err != nil {

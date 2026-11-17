@@ -13,6 +13,14 @@ import (
 // histórico recente. Jamais contém payload/comanda, token ou dados de
 // cliente — só ids, contadores, bytes e erros de infra (isso é contrato dos
 // chamadores: Add/Addf nunca recebem conteúdo de negócio).
+//
+// Sink (espelho local): toda entrada também é repassada ao log local do
+// arquivo — o agent.log guarda o histórico completo de TODAS as execuções
+// (rotação 10 MB), mesmo com debug_mode=false. O ENVIO ao servidor segue
+// gateado pela config (Agent.sendDebug só posta com debug_mode=true — o
+// buffer chega inteiro na 1ª rodada depois que o admin liga). O Sink recebe
+// a mensagem SEM o timestamp UTC do anel (o logger acrescenta o dele,
+// local). Chamado fora do lock — nunca chama de volta no buffer.
 const (
 	debugMaxEntries = 200
 	DebugMaxChars   = 2000
@@ -22,6 +30,7 @@ const (
 type DebugBuffer struct {
 	mu      sync.Mutex
 	entries []string
+	Sink    func(msg string) // nil = sem espelho (testes)
 }
 
 func NewDebugBuffer() *DebugBuffer {
@@ -58,10 +67,16 @@ func (d *DebugBuffer) Add(msg string) {
 		}
 	}
 	d.mu.Lock()
-	defer d.mu.Unlock()
 	d.entries = append(d.entries, entry)
 	if len(d.entries) > debugMaxEntries {
 		d.entries = d.entries[len(d.entries)-debugMaxEntries:]
+	}
+	d.mu.Unlock()
+	// Espelho pro log local vai SEM o timestamp do anel (o logger põe o
+	// dele) e SEM truncamento (o teto de 2000 chars é contrato do POST,
+	// não do arquivo). Fora do lock — o logger não chama de volta.
+	if d.Sink != nil {
+		d.Sink(msg)
 	}
 }
 

@@ -9,8 +9,9 @@ agent.lock
 printer-agent.download
 printer-agent.old
 
-# binários de build (dev na raiz; releases em dist/)
+# binários de build (dev na raiz; releases em dist/ e pacote de instalação em release/)
 dist/
+release/
 printer-agent
 printer-agent.exe
 localissimo-print-agent

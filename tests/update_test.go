@@ -110,7 +110,7 @@ func TestUpdateFluxoFeliz(t *testing.T) {
 	}
 
 	// Instalação: idle=true + oferta casando com o download → swap+spawn.
-	if !upd.InstallIfReady(true) {
+	if !upd.InstallIfReady() {
 		t.Fatalf("InstallIfReady deveria instalar")
 	}
 	if len(*spawned) != 1 {
@@ -129,28 +129,42 @@ func TestUpdateFluxoFeliz(t *testing.T) {
 	// Idempotente: rodada seguinte (nova instância, versão igual) não re-instala.
 	upd.OwnVersion = "0.2.0"
 	upd.HandleOffer(offer)
-	if upd.InstallIfReady(true) {
+	if upd.InstallIfReady() {
 		t.Fatalf("versão igual à oferta não re-instala")
 	}
 }
 
-// Update só em rodada idle — nunca no meio de um lote (epic §7.3).
-func TestUpdateNuncaComJobs(t *testing.T) {
+// Update só em rodada idle — nunca no meio de um lote (epic §7.3). A regra
+// vive no Round (fonte única, sem parâmetro no InstallIfReady): rodada com
+// jobs nem passa a oferta ao updater; a vazia seguinte entrega.
+func TestUpdateSoEmRodadaIdle(t *testing.T) {
 	dir := t.TempDir()
-	upd, spawned, _, serve := newTestUpdater(t, dir)
-	novo := []byte("EXE-NOVO")
-	url := serve("/bin", novo)
-	offer := offerFor(url, "0.2.0", hexOf(novo))
-	upd.HandleOffer(offer)
-	waitFor(t, 2*time.Second, func() bool {
-		return upd.Downloaded() != nil
-	}, "download ficar pronto")
+	writeTokenFile(t, dir, "tok")
+	rails := newFakeRails("tok")
+	srv := startRails(t, rails)
+	a := newTestAgent(t, dir, srv.URL, rails)
+	fp := startFakePrinter(t)
+	setRailsCfg(rails, fp, map[string]any{
+		"agent_version":      "0.2.0",
+		"agent_download_url": srv.URL + "/nao-existe.bin", // download falha — irrelevante aqui
+		"agent_sha256":       strings.Repeat("0", 64),
+	})
+	rails.setJobs([]map[string]any{jobJSON(901, "kitchen", payloadComanda("u"))})
 
-	if upd.InstallIfReady(false) {
-		t.Fatalf("não pode instalar com jobs na fila")
+	if r := a.Round(context.Background()); r.Exit {
+		t.Fatalf("rodada com jobs não pode pedir exit")
 	}
-	if len(*spawned) != 0 {
-		t.Fatalf("spawn com jobs na fila!")
+	if a.Updater.Offer != nil {
+		t.Fatalf("rodada com lote nem pode ver a oferta (janela fechada): %+v", a.Updater.Offer)
+	}
+
+	rails.setJobs(nil)
+	a.Round(context.Background()) // idle → janela abre: a oferta chega ao updater
+	if a.Updater.Offer == nil || a.Updater.Offer.Version != "0.2.0" {
+		t.Fatalf("rodada idle deve entregar a oferta ao updater: %+v", a.Updater.Offer)
+	}
+	if a.Updater.InstallIfReady() {
+		t.Fatalf("sem download pronto não instala")
 	}
 }
 
@@ -171,7 +185,7 @@ func TestUpdateShaDivergenteDescarta(t *testing.T) {
 	if _, err := os.Stat(upd.DownloadPath()); !os.IsNotExist(err) {
 		t.Fatalf("download com sha errado deveria ser descartado: err=%v", err)
 	}
-	if upd.InstallIfReady(true) || len(*spawned) != 0 {
+	if upd.InstallIfReady() || len(*spawned) != 0 {
 		t.Fatalf("nada instalado com sha divergente")
 	}
 }
@@ -200,7 +214,7 @@ func TestUpdateOfertaMudouDescartaDownload(t *testing.T) {
 
 	// A oferta velha não instala mais (download dela foi descartado).
 	upd.Offer = offerA // força a comparação
-	if upd.InstallIfReady(true) {
+	if upd.InstallIfReady() {
 		t.Fatalf("release velha não pode instalar após o alvo mudar")
 	}
 	if len(*spawned) != 0 {
@@ -212,7 +226,7 @@ func TestUpdateOfertaMudouDescartaDownload(t *testing.T) {
 	waitFor(t, 2*time.Second, func() bool {
 		return upd.Downloaded() != nil && upd.Downloaded().Version == "0.3.0"
 	}, "re-download de B ficar pronto")
-	if !upd.InstallIfReady(true) {
+	if !upd.InstallIfReady() {
 		t.Fatalf("oferta vigente deveria instalar")
 	}
 }
@@ -234,7 +248,7 @@ func TestUpdateOfertaSumiu(t *testing.T) {
 		_, err := os.Stat(upd.DownloadPath())
 		return os.IsNotExist(err)
 	}, "download pendente ser limpo")
-	if upd.InstallIfReady(true) || len(*spawned) != 0 {
+	if upd.InstallIfReady() || len(*spawned) != 0 {
 		t.Fatalf("sem oferta não instala nada")
 	}
 }
@@ -254,7 +268,7 @@ func TestUpdateSpawnFalhoReverte(t *testing.T) {
 	upd.Spawn = func(path string, args []string) error {
 		return context.DeadlineExceeded // CreateProcess falhou
 	}
-	if upd.InstallIfReady(true) {
+	if upd.InstallIfReady() {
 		t.Fatalf("spawn falho não confirma update")
 	}
 	// Estado revertido: exe = velho, .download = novo, .old não existe.
@@ -269,7 +283,7 @@ func TestUpdateSpawnFalhoReverte(t *testing.T) {
 	}
 	// E a próxima rodada pode tentar de novo (spawn consertado).
 	upd.Spawn = func(path string, args []string) error { return nil }
-	if !upd.InstallIfReady(true) {
+	if !upd.InstallIfReady() {
 		t.Fatalf("nova tentativa na rodada seguinte deveria instalar")
 	}
 }
@@ -294,7 +308,7 @@ func TestUpdatePulaDownloadComShaNovoNaPasta(t *testing.T) {
 	waitFor(t, 2*time.Second, func() bool {
 		return upd.Downloaded() != nil
 	}, "revalidação do arquivo existente")
-	if !upd.InstallIfReady(true) || len(*spawned) != 1 {
+	if !upd.InstallIfReady() || len(*spawned) != 1 {
 		t.Fatalf("download pré-existente válido deveria instalar sem rede")
 	}
 }
@@ -312,7 +326,7 @@ func TestUpdateLimpaOldAnterior(t *testing.T) {
 		return upd.Downloaded() != nil
 	}, "download ficar pronto")
 
-	if !upd.InstallIfReady(true) {
+	if !upd.InstallIfReady() {
 		t.Fatalf("swap deveria limpar o .old anterior e prosseguir")
 	}
 }
@@ -400,7 +414,7 @@ func TestUpdateTrocaNoMeioDoDownload(t *testing.T) {
 	}, "download de B começar e terminar após cancelamento de A")
 
 	upd.Spawn = func(path string, args []string) error { return nil }
-	if !upd.InstallIfReady(true) {
+	if !upd.InstallIfReady() {
 		t.Fatalf("B deveria instalar após o cancelamento de A")
 	}
 	if got, _ := os.ReadFile(exe); string(got) != "BINARIO-B" {
@@ -448,7 +462,7 @@ func TestUpdateRebaixaAposFalha(t *testing.T) {
 	waitFor(t, 2*time.Second, func() bool {
 		return upd.Downloaded() != nil
 	}, "re-download após servidor voltar")
-	if !upd.InstallIfReady(true) {
+	if !upd.InstallIfReady() {
 		t.Fatalf("deveria instalar após re-download")
 	}
 }

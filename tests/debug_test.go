@@ -79,6 +79,45 @@ func TestDebugBufferSnapshotCopia(t *testing.T) {
 	}
 }
 
+// Sink (espelho local): toda entrada também vai pro agent.log — o arquivo
+// guarda TUDO independente do debug_mode; o envio ao servidor é que depende
+// da config (sendDebug). O Sink recebe a mensagem SEM timestamp do anel
+// (o logger acrescenta o dele) e SEM truncamento.
+func TestDebugBufferEspelhaNoSink(t *testing.T) {
+	d := agent.NewDebugBuffer()
+	var got []string
+	d.Sink = func(msg string) { got = append(got, msg) }
+	d.Addf("job %d (%s) → %s · %d bytes ok", 7, "kitchen", "usb · Tomate MDK-080", 1423)
+	d.Add("boot: sem token — aguardando token.txt")
+	if len(got) != 2 {
+		t.Fatalf("sink deveria receber as 2 entradas: %d", len(got))
+	}
+	if !strings.Contains(got[0], "job 7 (kitchen)") || !strings.Contains(got[0], "1423 bytes ok") {
+		t.Fatalf("espelho 1: %q", got[0])
+	}
+	if !strings.Contains(got[1], "sem token") {
+		t.Fatalf("espelho 2: %q", got[1])
+	}
+	// Sem timestamp UTC no espelho (quem põe timestamp no arquivo é o logger).
+	if len(got[0]) > 0 && len(got[0]) >= 20 && got[0][19] == 'Z' {
+		t.Fatalf("espelho não deveria embutir timestamp do anel: %q", got[0][:30])
+	}
+	// O anel segue intacto (formato com timestamp UTC preservado).
+	snap := d.Snapshot()
+	if len(snap) != 2 || !strings.Contains(snap[0], "job 7 (kitchen)") {
+		t.Fatalf("anel: %v", snap)
+	}
+}
+
+// Sink nil (default dos testes) não pode panicar nem duplicar entrada.
+func TestDebugBufferSemSink(t *testing.T) {
+	d := agent.NewDebugBuffer()
+	d.Add("sem espelho")
+	if d.Len() != 1 {
+		t.Fatalf("anel: %d", d.Len())
+	}
+}
+
 func min(a, b int) int {
 	if a < b {
 		return a

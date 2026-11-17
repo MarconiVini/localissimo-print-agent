@@ -87,6 +87,34 @@ func TestBootOrdemReportAntesDeConfig(t *testing.T) {
 	}
 }
 
+// A coleta de impressoras nunca fica silenciosa: o resumo do OS (o que o
+// spooler/CUPS enxergou, falhas de API) chega no buffer de debug antes do
+// aceite — com "0 coletada(s)" o log diz se faltou driver ou morreu API.
+func TestReportGateNotaDeColetaNoDebug(t *testing.T) {
+	dir := t.TempDir()
+	writeTokenFile(t, dir, "tok")
+	rails := newFakeRails("tok")
+	srv := startRails(t, rails)
+	a := newTestAgent(t, dir, srv.URL, rails)
+
+	if !a.ReportGate(context.Background()) {
+		t.Fatalf("reportGate falhou")
+	}
+	var passos []string
+	for _, e := range a.Dbg.Snapshot() {
+		if strings.Contains(e, "boot passo 2") {
+			passos = append(passos, e)
+		}
+	}
+	// Nota da coleta + aceite do report (ambos citam "boot passo 2").
+	if len(passos) < 2 {
+		t.Fatalf("esperava nota da coleta + aceite no debug, veio %v", passos)
+	}
+	if !strings.Contains(passos[0], "boot passo 2: ") {
+		t.Fatalf("1ª entrada deveria ser o resumo da coleta: %v", passos)
+	}
+}
+
 func TestReportGateBackoffE404(t *testing.T) {
 	dir := t.TempDir()
 	writeTokenFile(t, dir, "tok-velho")
@@ -348,6 +376,36 @@ func TestRoundPoll5xxBackoffExponencial(t *testing.T) {
 	rails.setJobs(nil)
 	if r := a.Round(context.Background()); a.Backoff != 0 || r.Sleep != 2*time.Second {
 		t.Fatalf("sucesso deve zerar backoff e dormir o intervalo: backoff=%v sleep=%v", a.Backoff, r.Sleep)
+	}
+}
+
+// Backoff armado não sobrevive a episódio de 404 (contrato: resposta do
+// servidor zera o backoff — "reset no sucesso"): 502 arma, 404 zera, e a
+// falha de rede seguinte recomeça no intervalo base, não dobrado.
+func TestRoundPoll404ZeraBackoff(t *testing.T) {
+	dir := t.TempDir()
+	writeTokenFile(t, dir, "tok")
+	rails := newFakeRails("tok")
+	srv := startRails(t, rails)
+	a := newTestAgent(t, dir, srv.URL, rails)
+	fp := startFakePrinter(t)
+	applyCfg(a, fp, 3, false, "v1")
+	setRailsCfg(rails, fp, map[string]any{"config_version": "v1"})
+
+	rails.pollStatus = 502
+	if r := a.Round(context.Background()); r.Sleep != 3*time.Second {
+		t.Fatalf("1ª falha 502: backoff base 3s, veio %v", r.Sleep)
+	}
+	rails.pollStatus = 404
+	if r := a.Round(context.Background()); r.Sleep != agent.NotFoundRetry {
+		t.Fatalf("404: retry fixo 30s, veio %v", r.Sleep)
+	}
+	if a.Backoff != 0 {
+		t.Fatalf("404 deve zerar o backoff armado, veio %v", a.Backoff)
+	}
+	rails.pollStatus = 502
+	if r := a.Round(context.Background()); r.Sleep != 3*time.Second {
+		t.Fatalf("falha após o 404 recomeça no base (3s), não dobrado: %v", r.Sleep)
 	}
 }
 

@@ -8,12 +8,14 @@ import (
 )
 
 // Log local rotacionado (epic §3): rodando como tarefa/serviço não há
-// console — o agent.log é sempre ativo, independente do debug_mode.
-// Rotação ~1 MB, mantém 1 anterior (agent.log.1): fecha → renomeia → reabre.
-// Rename falhou (arquivo preso, típico no Windows) → segue escrevendo no
-// mesmo arquivo e tenta de novo na próxima escrita/boot seguinte.
+// console — o agent.log é sempre ativo, independente do debug_mode, e
+// acumula TUDO (linhas de evento + espelho do buffer de debug, via Sink
+// do DebugBuffer) através das execuções. Rotação ~10 MB, mantém 1 anterior
+// (agent.log.1): fecha → renomeia → reabre. Rename falhou (arquivo preso,
+// típico no Windows) → segue escrevendo no mesmo arquivo e tenta de novo
+// na próxima escrita/boot seguinte.
 const (
-	LogRotateBytes = 1 << 20 // ~1 MB
+	LogRotateBytes = 10 << 20 // ~10 MB (≈ 80 mil linhas de ~130 bytes)
 	logSuffixPrev  = ".1"
 )
 
@@ -100,6 +102,12 @@ func (l *Logger) rotateLocked() {
 	}
 	l.f = nf
 	l.written = 0
+	// Marcador no arquivo novo: sem ele, quem abre o agent.log não sabe
+	// quando/por que o histórico anterior virou agent.log.1.
+	marker := time.Now().Format(time.RFC3339) + " --- log rotacionado (passou de ~10 MB; histórico anterior em agent.log.1) ---\n"
+	if n, err := nf.WriteString(marker); err == nil {
+		l.written += int64(n)
+	}
 }
 
 func (l *Logger) Close() {

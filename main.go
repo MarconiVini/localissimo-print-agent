@@ -77,6 +77,10 @@ func main() {
 	defer log.Close()
 
 	dbg := agent.NewDebugBuffer()
+	// Log local guarda TUDO (linhas de evento + espelho do buffer de debug,
+	// prefixo "·") — a diagnose não depende do debug_mode estar ligado. O
+	// envio ao servidor é outro canal: só com debug_mode=true na config.
+	dbg.Sink = func(msg string) { log.Printf("· %s", msg) }
 	log.Printf("printer-agent %s — %s/%s · hostname %s", agent.Version, runtime.GOOS, runtime.GOARCH, hostnameOf())
 
 	upd := agent.NewUpdater(rc.Dir, rc.ExePath, exeArgsForRestart(), log, dbg)

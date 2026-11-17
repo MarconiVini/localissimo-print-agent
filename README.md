@@ -43,8 +43,9 @@ comanda nunca exige recompilar o agente.
 
 **Arquivos ao lado do binário** (epic §3): `token.txt` · `config.json`
 opcional só com `{"server": "..."}` (precedência: default compilado <
-`config.json` < flag `-server`) · `agent.log` rotacionado (~1 MB, 1
-anterior; sempre ativo) · `agent.lock` (instância única: flock/mutex
+`config.json` < flag `-server`) · `agent.log` rotacionado (~10 MB, 1
+anterior; sempre ativo, com TUDO — evento + espelho do buffer de debug;
+o envio ao servidor só com `debug_mode` ligado no painel) · `agent.lock` (instância única: flock/mutex
 nomeado) · `printer-agent.download` (binário do auto-update) ·
 `printer-agent.old` (lixo do swap, apagado no boot seguinte).
 
@@ -249,7 +250,12 @@ no poll) + fake impressora TCP:
   exponencial com teto/reset, config nova entre rodadas, clamp do intervalo;
 - debug: um POST por rodada com o buffer inteiro, falha engolida, sem
   payload nas entradas; buffer: anel de 200, truncamento com cauda;
-- log: rotação ~1 MB com fallback de rename falho;
+- log: rotação ~10 MB com fallback de rename falho (arquivo novo abre com
+  marcador de rotação); espelho do buffer de debug no arquivo (envio ao
+  servidor continua gateado por debug_mode); heartbeat de idle a cada 5 min
+  com os números da sessão; estados estáticos (configured=false, 404, token
+  ausente) logam 1× e repetem só a cada 5 min com contagem de suprimidas;
+  lote marcado antes do write (bracket de crash) e resumo no encerramento;
 - update: build sujo ignora, fluxo feliz com swap+spawn, update só idle,
   sha divergente descarta, oferta mudou/sumiu descarta, spawn falho
   reverte, pulo de download com sha válido, self-heal, cleanup do `.old`;

@@ -252,15 +252,14 @@ func (u *Updater) discardDownloadLocked() {
 	os.Remove(u.DownloadPath())
 }
 
-// InstallIfReady troca o binário e faz o spawn, se tudo casar. Retorna
+// InstallIfReady troca o binário e faz o spawn, se tudo casar. A regra
+// "update só em rodada idle" vive no CHAMADOR (Round só o invoca em rodada
+// vazia — uma fonte única da regra); aqui é só a mecânica do swap. Retorna
 // spawned=true quando a instância nova foi criada — o chamador encerra.
-func (u *Updater) InstallIfReady(idle bool) bool {
+func (u *Updater) InstallIfReady() bool {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 
-	if !idle {
-		return false
-	}
 	if u.Offer == nil || u.downloaded == nil || !u.Offer.equal(u.downloaded) {
 		return false // sem oferta, sem download pronto ou alvo mudou no meio
 	}

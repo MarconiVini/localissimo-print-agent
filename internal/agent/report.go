@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"regexp"
@@ -66,32 +67,96 @@ func thermalScore(entry map[string]string) int {
 }
 
 // FilterAndRank: filtra virtuais, ordena térmica primeiro (score desc,
-// empate alfabético por name) e corta no teto de 50.
+// empate alfabético por name) e corta no teto de 50. Delega no
+// FilterAndRankDetails — o filtro é UM só, os motivos do log nunca
+// divergem do que o report leva.
 func FilterAndRank(entries []map[string]string) []map[string]string {
-	limpo := make([]map[string]string, 0, len(entries))
+	kept, _ := FilterAndRankDetails(entries)
+	return kept
+}
+
+// FilterAndRankDetails é o filtro ÚNICO (FilterAndRank delega aqui): além
+// do snapshot que vai no report, lista o nome do que foi descartado
+// (virtuais e entradas sem nome) — o log de boot precisa explicar a
+// diferença entre coletado e enviado, senão "0 coletada(s)" não diz se
+// faltou driver ou sobrou filtro. Ordena térmica primeiro (score desc,
+// empate alfabético por name) e corta no teto de 50.
+func FilterAndRankDetails(entries []map[string]string) (kept []map[string]string, dropped []string) {
+	kept = make([]map[string]string, 0, len(entries))
 	for _, e := range entries {
 		if e == nil {
 			continue
 		}
 		if strings.TrimSpace(e["name"]) == "" {
+			dropped = append(dropped, "(sem nome)")
 			continue // entrada sem name não sobrevive no servidor de qualquer forma
 		}
 		if isVirtualPrinter(e) {
+			dropped = append(dropped, e["name"])
 			continue
 		}
-		limpo = append(limpo, e)
+		kept = append(kept, e)
 	}
-	sort.SliceStable(limpo, func(i, j int) bool {
-		si, sj := thermalScore(limpo[i]), thermalScore(limpo[j])
+	sort.SliceStable(kept, func(i, j int) bool {
+		si, sj := thermalScore(kept[i]), thermalScore(kept[j])
 		if si != sj {
 			return si > sj
 		}
-		return limpo[i]["name"] < limpo[j]["name"]
+		return kept[i]["name"] < kept[j]["name"]
 	})
-	if len(limpo) > maxReportPrinters {
-		limpo = limpo[:maxReportPrinters]
+	if len(kept) > maxReportPrinters {
+		kept = kept[:maxReportPrinters]
 	}
-	return limpo
+	return kept, dropped
+}
+
+// ---------- coleta do boot (resumo com evidências) ----------
+
+// DiscoveryResume resume UMA passada de coleta: o que o OS entregou, o que
+// sobreviveu ao filtro e as evidências do caminho (falha de API, contagens,
+// dica de ação). Nada silencioso: "0 impressoras" chega no log com motivo —
+// suporte precisa distinguir "driver não instalado" de "spooler/CUPS morto".
+type DiscoveryResume struct {
+	RawCount int                 // coletado do OS, antes do filtro
+	Kept     []map[string]string // após filtro+ordem — é o que vai no report
+	Dropped  []string            // nomes descartados pelo filtro
+	Notes    []string            // evidências do OS/dicas, uma linha cada
+}
+
+// CollectPrinters é o passo de coleta do boot: descoberta do OS → filtro →
+// ordem, com o resumo do que houve para o log/debug.
+func CollectPrinters(ctx context.Context) DiscoveryResume {
+	raw, notes := discoverPrinters(ctx)
+	return BuildDiscoveryResume(raw, notes)
+}
+
+// BuildDiscoveryResume junta descoberta + filtro num resumo único — puro,
+// testável em qualquer OS.
+func BuildDiscoveryResume(raw []map[string]string, notes []string) DiscoveryResume {
+	kept, dropped := FilterAndRankDetails(raw)
+	res := DiscoveryResume{RawCount: len(raw), Kept: kept, Dropped: dropped, Notes: notes}
+	switch {
+	case len(raw) == 0:
+		// Zero impressoras — o motivo específico já veio nas notas do OS
+		// (sem driver, spooler parado, CUPS ausente…); a dica de ação é a
+		// mesma nos dois casos e lembra que o report só acontece no boot.
+		res.Notes = append(res.Notes,
+			"nenhuma impressora encontrada no sistema — instale o driver da térmica e reinicie o agente (o report de impressoras só acontece no boot)")
+	case len(dropped) > 0:
+		res.Notes = append(res.Notes,
+			fmt.Sprintf("filtro do report descartou %d entrada(s): %s", len(dropped), clampLine(strings.Join(dropped, ", "), 300)))
+	}
+	return res
+}
+
+// clampLine corta em ~max runas (nomes do OS não podem quebrar o formato do
+// log; o buffer de debug trunca por runa também).
+func clampLine(s string, max int) string {
+	r := []rune(s)
+	if len(r) <= max {
+		return s
+	}
+	return string(r[:max]) + "…"
 }
 
 // ---------- CUPS (Linux/macOS) ----------
@@ -295,23 +360,33 @@ func PrinterStatusText(status uint32) string {
 			parts = append(parts, txt)
 		}
 	}
-	add(1, "pausada")
-	add(2, "erro")
-	add(4, "excluindo")
-	add(8, "papel travado")
-	add(16, "sem papel")
-	add(64, "problema no papel")
-	add(128, "offline")
-	add(512, "ocupada")
-	add(1024, "imprimindo")
-	add(4096, "indisponível")
-	add(8192, "aguardando")
-	add(16384, "processando")
-	add(131072, "toner baixo")
-	add(262144, "sem toner")
-	add(1048576, "tampa aberta")
-	add(2097152, "intervenção do usuário")
-	add(8388608, "offline") // PRINTER_STATUS_OFFLINE bit alto também existe em drivers antigos
+	// Valores do winspool.h do SDK (conferidos no header — bit errado aqui
+	// vira diagnóstico errado no painel). IO_ACTIVE (0x100) fica de fora de
+	// propósito: atividade normal de I/O não é estado de problema.
+	add(1, "pausada")                           // PRINTER_STATUS_PAUSED
+	add(2, "erro")                              // PRINTER_STATUS_ERROR
+	add(4, "excluindo")                         // PRINTER_STATUS_PENDING_DELETION
+	add(8, "papel travado")                     // PRINTER_STATUS_PAPER_JAM
+	add(16, "sem papel")                        // PRINTER_STATUS_PAPER_OUT
+	add(32, "alimentação manual")               // PRINTER_STATUS_MANUAL_FEED
+	add(64, "problema no papel")                // PRINTER_STATUS_PAPER_PROBLEM
+	add(128, "offline")                         // PRINTER_STATUS_OFFLINE
+	add(512, "ocupada")                         // PRINTER_STATUS_BUSY
+	add(1024, "imprimindo")                     // PRINTER_STATUS_PRINTING
+	add(2048, "bandeja de saída cheia")         // PRINTER_STATUS_OUTPUT_BIN_FULL
+	add(4096, "indisponível")                   // PRINTER_STATUS_NOT_AVAILABLE
+	add(8192, "aguardando")                     // PRINTER_STATUS_WAITING
+	add(16384, "processando")                   // PRINTER_STATUS_PROCESSING
+	add(32768, "inicializando")                 // PRINTER_STATUS_INITIALIZING
+	add(65536, "aquecendo")                     // PRINTER_STATUS_WARMING_UP
+	add(131072, "toner baixo")                  // PRINTER_STATUS_TONER_LOW
+	add(262144, "sem toner")                    // PRINTER_STATUS_NO_TONER
+	add(524288, "falha na página")              // PRINTER_STATUS_PAGE_PUNT
+	add(1048576, "intervenção do usuário")      // PRINTER_STATUS_USER_INTERVENTION
+	add(2097152, "sem memória")                 // PRINTER_STATUS_OUT_OF_MEMORY
+	add(4194304, "tampa aberta")                // PRINTER_STATUS_DOOR_OPEN
+	add(8388608, "servidor de impressão sumiu") // PRINTER_STATUS_SERVER_UNKNOWN
+	add(16777216, "economia de energia")        // PRINTER_STATUS_POWER_SAVE
 	if len(parts) == 0 {
 		return fmt.Sprintf("0x%x", status)
 	}
