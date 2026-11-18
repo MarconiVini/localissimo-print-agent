@@ -70,6 +70,8 @@ O agente, em **rodada idle** (poll vazio — nunca atrasa comanda):
 5. swap: binário em execução → `printer-agent.old` → `.download` → binário →
    **spawn do novo** (env `AGENT_UPDATE_RESTART=1`). Spawn falhou → reverte
    os renames e segue na atual. Spawn confirmado → processo velho encerra;
+   com `-spawnless` (serviço) não há spawn: troca concluída → encerra com
+   falha e o supervisor (SCM/systemd) religa no binário novo;
 6. a instância nova espera o lock até ~30s (o velho pode ainda estar vivo);
    sem lock → **exit com erro** (nunca duas instâncias = todo job em dobro).
    O 1º report/poll dela carrega a versão nova — é assim que o Rails
@@ -96,25 +98,36 @@ existe → renomeia e segue; `.old` fica de rollback manual.
 
    Log esperado: versão, servidor, report de impressoras, config. Dispare
    uma comanda de teste pelo kanban e confira na impressora.
-4. Auto-start no boot (dois caminhos):
-   - **Atalho na inicialização (simples):** `Win+R` → `shell:startup` →
-     atalho para o `.exe`. Fica uma janela de console aberta — fechar ela
-     encerra o agente (jobs pendentes ficam no servidor).
-   - **Agendador de Tarefas (sem janela visível):** num Prompt como
-     administrador:
-
-     ```bat
-     schtasks /create /tn "LocalissimoPrintAgent" /sc onlogon /rl highest ^
-       /tr "\"C:\localissimo-print-agent\printer-agent.exe\""
-     ```
-
-   O agente é **portável**: tudo (token, log, lock, download do update) vive
-   na pasta dele — mover a pasta = mover o agente inteiro.
+4. **Serviço no boot (recomendado — pacote v0.2.0+):** clique com o direito
+   no `install.bat` da pasta `windows\` do pacote → "Executar como
+   administrador". O agente vira o serviço **"Localissimo Printer Agent"**
+   (`printer-agent` no SCM): sobe no boot **sem login** e, se o processo
+   cair, o próprio Windows religa em ~10s (`sc failure` + `failureflag`,
+   configurados pelo instalador) — **não há watcher: quem vigia é o OS**.
+   O instalador roda o binário com `-spawnless`: no auto-update ele não
+   spawna filho — encerra com falha e o SCM religa já no binário novo.
+   Desinstalar: `uninstall.bat` (arquivos preservados). O agente continua
+   **portável**: tudo (token, log, lock, download do update) vive na pasta
+   dele — mover a pasta = mover o agente inteiro (reinstale na pasta nova).
 5. Atualizar de versão: em produção, o próprio agente se atualiza pelo
-   auto-update (alvo no card Comandas). Manual: encerrar (Ctrl+C ou
-   `taskkill /im printer-agent.exe /f`), substituir o `.exe`, subir de novo.
+   auto-update (alvo no card Comandas) — instalado como serviço, o SCM
+   religa na versão nova. Via pacote: copie a pasta da versão nova ao lado
+   e nela rode o `install.bat` (recria o serviço apontando para a pasta
+   nova; rollback = rodar o install da pasta antiga).
 
 ### Linux amd64 / Raspberry Pi OS 64-bit (linux-arm64)
+
+Com o **pacote** (`dist/v<versão>/linux/`), um comando registra o serviço
+systemd — detecta amd64/arm64 pelo `uname -m`, sobe no boot **sem login** e
+religa em ~10s se o processo cair (`Restart=on-failure`, `StartLimitIntervalSec=0`):
+
+```bash
+sudo ./install.sh
+```
+
+Diagnose: `systemctl status printer-agent` · `journalctl -u printer-agent -f`
+· `tail -f agent.log`. Desinstalar: `sudo ./uninstall.sh` (arquivos
+preservados). Manual (sem o pacote):
 
 ```bash
 sudo mkdir -p /opt/localissimo
@@ -131,12 +144,13 @@ Serviço com auto-restart — `/etc/systemd/system/localissimo-print-agent.servi
 Description=Localissimo printer-agent
 After=network-online.target
 Wants=network-online.target
+StartLimitIntervalSec=0
 
 [Service]
 WorkingDirectory=/opt/localissimo
-ExecStart=/opt/localissimo/printer-agent
-Restart=always
-RestartSec=5
+ExecStart=/opt/localissimo/printer-agent -spawnless
+Restart=on-failure
+RestartSec=10s
 
 [Install]
 WantedBy=multi-user.target
@@ -203,16 +217,23 @@ go test ./... -coverpkg=./... -cover   # cobertura contra o código real
 # build de dev (versão suja: auto-update desligado por segurança)
 go build -o printer-agent .
 
-# release dos 5 alvos em dist/ + SHA256SUMS.txt (fonte dos hashes do
-# catálogo do Rails — epic §7.2)
-./build.sh 0.1.0
+# release em pacote versionado: dist/v0.2.0/{windows,linux,darwin}/
+# (binários + instaladores + token.txt vazio + SHA256SUMS.txt — fonte dos
+# hashes do catálogo do Rails, epic §7.2)
+./build.sh 0.2.0
 ```
 
-As releases ficam dentro do projeto, em **`dist/`** (gitignored — binário
-não vai pro git): `printer-agent-windows-amd64.exe` · `linux-amd64` ·
-`linux-arm64` · `darwin-arm64` · `darwin-amd64` · `SHA256SUMS.txt`. O
-`build.sh` valida `-version` do binário nativo contra a versão pedida
-(release mal registrada vira ciclo eterno de update — epic §7.2).
+As releases ficam dentro do projeto, em **`dist/v<versão>/`** (gitignored —
+binário não vai pro git): cada versão é uma cópia completa com os
+instaladores (`install.bat`/`uninstall.bat`, `install.sh`/`uninstall.sh`,
+copiados de `packaging/`) e um `LEIA-ME.txt` para a loja. Sem `config.json`
+no pacote: a URL de produção é o default compilado do agente
+(`internal/agent.DefaultServer`); `-server`/`config.json` seguem como
+override dev/tester. Versões antigas nunca são apagadas. O `build.sh`
+valida `-version` do binário nativo contra a versão pedida (release mal
+registrada vira ciclo eterno de update — epic §7.2). A única dependência
+externa do Go é `golang.org/x/sys` (canônica do time Go), confinada ao
+harness de serviço do Windows.
 
 ## Comportamento (mapa rápido)
 
@@ -225,6 +246,7 @@ não vai pro git): `printer-agent-windows-amd64.exe` · `linux-amd64` ·
 | Token inválido / flag off | 404 → retry fixo 30s, re-lê token.txt | volta sozinho quando resolvido |
 | `configured=false` | congela escrita, segue pollando | admin completa a config → entra no loop sem restart |
 | Versão nova anunciada | idle → baixa → sha → swap → restart | card mostra "agente X · em dia" |
+| Processo cai (com serviço instalado) | — | SCM (Windows) / systemd religa em ~10s |
 | Ctrl+C / SIGTERM | encerra limpo | pendentes ficam no servidor, nada se perde |
 
 Modo debug (`debug_mode` na config): a cada rodada o agente posta o buffer
@@ -265,7 +287,7 @@ no poll) + fake impressora TCP:
 ## Layout
 
 ```
-main.go                  bootstrap: flags, instância única, shutdown limpo
+main.go                  bootstrap: flags, console/serviço (SCM), boot + loop
 internal/agent/          TODO o agente (pacote testável, 0 dependências):
   config.go              token.txt / config.json / -server (precedência) + caminhos
   client.go              contrato HTTP: config/poll/ack/printers/logs + download
@@ -279,9 +301,13 @@ internal/agent/          TODO o agente (pacote testável, 0 dependências):
   logger.go              agent.log rotacionado
   lock_unix/windows.go   instância única (flock / mutex nomeado)
   version.go             versão do build (ldflags) + validação X.Y.Z
+internal/winsvc/         serviço nativo do Windows (x/sys windows-only): o SCM
+                         sobe no boot e religa em falha — não há watcher
+packaging/               install/uninstall (bat + sh) e LEIA-ME — o build.sh
+                         copia pro pacote; os .sh registram unit systemd
 tests/                   pacote externo de testes (fake Rails + fake impressora
                          TCP + servidor de binários fake — sem hardware)
 tester/                  HTML que simula o device e renderiza o papel 80mm
-build.sh                 release dos 5 alvos → dist/ + SHA256SUMS.txt
+build.sh                 pacote por versão → dist/v<versão>/{windows,linux,darwin}/
 epic.md                  a especificação (fonte da verdade)
 ```

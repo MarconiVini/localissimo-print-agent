@@ -24,6 +24,9 @@ import (
 //     (nunca instala release retirada/trocada);
 //   - spawn do novo confirmado é condição para encerrar; falhou → reverte
 //     os renames e segue na versão atual;
+//   - modo serviço (-spawnless, instaladores): sem spawn — troca concluída
+//     = encerrar com falha; o supervisor (SCM/systemd) religa no binário
+//     novo. Renames e sha256 seguem idênticos; só o filho não existe;
 //   - a instância nova, com env AGENT_UPDATE_RESTART=1, espera o lock até
 //     ~30s; sem lock → exit com erro (nunca duas instâncias);
 //   - self-heal no boot: binário sumiu (crash entre os renames) e
@@ -43,11 +46,13 @@ type Updater struct {
 	log        *Logger
 	dbg        *DebugBuffer
 	Spawn      func(exePath string, args []string) error // injetável (testes)
+	Spawnless  bool                                      // serviço: sem spawn pós-update — o supervisor religa
 
 	Offer       *UpdateOffer // última oferta recebida do servidor
 	downloaded  *UpdateOffer // oferta cujo binário está em disco, válido
 	dlCancel    context.CancelFunc
 	dlBusy      bool
+	swapped     bool   // última instalação concluiu a troca (sinal do encerramento pós-update)
 	loggedDirty string // motivo já logado para não repetir a cada rodada
 }
 
@@ -68,6 +73,15 @@ func (u *Updater) Downloaded() *UpdateOffer {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	return u.downloaded
+}
+
+// Swapped: a última instalação concluiu a troca do binário (o processo em
+// execução é velho). O chamador decide encerrar; sob supervisor isso vira
+// exit ≠ 0 — que é o religar no binário novo.
+func (u *Updater) Swapped() bool {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.swapped
 }
 
 // Busy: download em curso?
@@ -285,6 +299,17 @@ func (u *Updater) InstallIfReady() bool {
 	}
 	os.Chmod(u.ExePath, dlFileMode) // já é 0755 da escrita; renomear preserva, mas garantir custa nada
 
+	if u.Spawnless {
+		// Modo serviço (instaladores passam -spawnless): nada de filho —
+		// o trabalho é deixar o binário novo no ExePath e encerrar com
+		// falha; o supervisor religa em segundos, já na versão nova.
+		u.downloaded = nil
+		u.swapped = true
+		u.dbg.Addf("update: binário %s promovido — sem spawn (serviço): o supervisor religa na versão nova", u.Offer.Version)
+		u.log.Printf("update: binário %s no lugar — encerrando para o supervisor religar", u.Offer.Version)
+		return true
+	}
+
 	if err := u.Spawn(u.ExePath, u.exeArgs); err != nil {
 		// Spawn falho (AV removeu, disco, permissão) → reverte os renames:
 		// o novo volta a .download e o .old volta a binário (epic §7.4.4).
@@ -296,6 +321,7 @@ func (u *Updater) InstallIfReady() bool {
 	}
 
 	u.downloaded = nil
+	u.swapped = true
 	u.dbg.Addf("update: spawn confirmado da versão %s — encerrando processo antigo", u.Offer.Version)
 	u.log.Printf("update: instância nova (%s) em execução — encerrando", u.Offer.Version)
 	return true

@@ -1,0 +1,43 @@
+printer-agent — Localissimo (comandas térmicas 80mm)
+====================================================
+
+O QUE É
+  Agente que imprime as comandas térmicas do quadro de pedidos. Fica
+  rodando o tempo todo; instalado, sobe sozinho no boot do Windows/Linux
+  (sem login) e é reerguido automaticamente em ~10s se cair.
+
+COMO INSTALAR (uma vez, precisa de administrador)
+  Windows: pasta windows\ — clique com o direito em install.bat >
+           "Executar como administrador". O serviço "Localissimo Printer
+           Agent" aparece no services.msc e sobe no boot.
+  Linux:   pasta linux/ — sudo ./install.sh (detecta amd64/arm64 sozinho).
+  macOS:   sem instalador por enquanto; rode o binário da pasta darwin/
+           no terminal (console).
+
+CONFIGURAR (uma vez por loja)
+  1. No painel do Localissimo, quadro de pedidos > card Impressora, modo
+     agent: gere o token do device.
+  2. Cole o token no arquivo token.txt (mesma pasta do binário). O agente
+     detecta em até 30s — não precisa reiniciar nada.
+  3. Escolha a impressora no painel (o agente já reportou as que enxergou).
+  O servidor é o localissimo.com.br por padrão; nada para configurar aqui.
+
+DIAGNOSE
+  Log completo: agent.log (na pasta do binário).
+  Windows: sc query printer-agent · services.msc ("Localissimo Printer Agent")
+  Linux:   systemctl status printer-agent · journalctl -u printer-agent -f
+
+DESINSTALAR
+  Windows: uninstall.bat (como administrador) — arquivos preservados.
+  Linux:   sudo ./uninstall.sh — arquivos preservados.
+
+ATUALIZAR PARA VERSÃO NOVA
+  Copie a pasta da versão nova ao lado da atual e nela rode o install
+  (Windows: install.bat admin · Linux: sudo ./install.sh) — o serviço é
+  recriado apontando para a pasta nova. Rollback = rodar o install da
+  pasta antiga. Sozinho, o agente também troca o próprio binário quando o
+  servidor anuncia versão nova (download com sha256 conferido).
+
+CADA VERSÃO DO PACOTE
+  Este pacote é uma versão completa (binários + instaladores). As versões
+  ficam lado a lado (dist/v<versão>/) e nenhuma é apagada automaticamente.

@@ -134,6 +134,40 @@ func TestUpdateFluxoFeliz(t *testing.T) {
 	}
 }
 
+// Modo serviço (-spawnless): a troca NÃO cria filho — renames idênticos
+// (binário novo no ExePath, velho no .old) e InstallIfReady devolve true
+// para o processo encerrar com falha; quem religa é o supervisor
+// (SCM/systemd — exit ≠ 0 é o contrato, cf. main.go: errUpdateExit).
+func TestUpdateSpawnlessNaoSpawna(t *testing.T) {
+	dir := t.TempDir()
+	upd, spawned, _, serve := newTestUpdater(t, dir)
+	upd.Spawnless = true
+	novo := []byte("EXE-NOVO")
+	url := serve("/printer-agent-linux-amd64", novo)
+	offer := offerFor(url, "0.2.0", hexOf(novo))
+
+	upd.HandleOffer(offer)
+	waitFor(t, 2*time.Second, func() bool {
+		return upd.Downloaded() != nil
+	}, "download ficar pronto")
+
+	if !upd.InstallIfReady() {
+		t.Fatalf("InstallIfReady deveria instalar mesmo em modo serviço")
+	}
+	if len(*spawned) != 0 {
+		t.Fatalf("modo serviço não pode spawnar filho: %v", *spawned)
+	}
+	if !upd.Swapped() {
+		t.Fatalf("Swapped deveria sinalizar a troca concluída")
+	}
+	if got, _ := os.ReadFile(upd.ExePath); string(got) != "EXE-NOVO" {
+		t.Fatalf("binário novo deveria estar no caminho do exe: %q", got)
+	}
+	if got, _ := os.ReadFile(upd.OldPath()); string(got) != "EXE-VELHO" {
+		t.Fatalf("binário velho deveria estar no .old (rollback manual): %q", got)
+	}
+}
+
 // Update só em rodada idle — nunca no meio de um lote (epic §7.3). A regra
 // vive no Round (fonte única, sem parâmetro no InstallIfReady): rodada com
 // jobs nem passa a oferta ao updater; a vazia seguinte entrega.
